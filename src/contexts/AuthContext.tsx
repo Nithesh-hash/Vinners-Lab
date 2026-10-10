@@ -57,6 +57,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      // Only set timer if user is logged in
+      if (user) {
+        timeoutId = setTimeout(() => {
+          signOut();
+          alert("You have been logged out due to 5 minutes of inactivity.");
+        }, 5 * 60 * 1000); // 5 minutes
+      }
+    };
+
+    const handleActivity = () => {
+      resetTimer();
+    };
+
+    if (user) {
+      resetTimer();
+      // Listen for user activity
+      window.addEventListener('mousemove', handleActivity);
+      window.addEventListener('keydown', handleActivity);
+      window.addEventListener('click', handleActivity);
+      window.addEventListener('scroll', handleActivity);
+      window.addEventListener('touchstart', handleActivity);
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('click', handleActivity);
+      window.removeEventListener('scroll', handleActivity);
+      window.removeEventListener('touchstart', handleActivity);
+    };
+  }, [user]);
+
   const signOut = async () => {
     await firebaseSignOut(auth);
   };
