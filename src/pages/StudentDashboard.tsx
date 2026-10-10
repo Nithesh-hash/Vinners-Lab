@@ -117,7 +117,7 @@ export default function StudentDashboard() {
 
       {/* Active Transactions */}
       <div className="glass-card overflow-hidden">
-        <div className="p-5 border-b border-slate-200/60 bg-white/40">
+        <div className="p-5 border-b border-slate-200/60 bg-white/40 flex justify-between items-center">
           <h2 className="text-lg font-bold text-slate-800">Your Issued Components</h2>
         </div>
         <div className="p-0">
@@ -167,6 +167,45 @@ export default function StudentDashboard() {
           )}
         </div>
       </div>
+
+      {/* History */}
+      {transactions.filter(t => t.status === 'Returned').length > 0 && (
+        <div className="glass-card overflow-hidden mt-8">
+          <div className="p-5 border-b border-slate-200/60 bg-white/40">
+            <h2 className="text-lg font-bold text-slate-800">Past Hardware Returns</h2>
+          </div>
+          <div className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-slate-50/50 text-slate-600">
+                  <tr>
+                    <th className="px-6 py-3 font-medium">Component</th>
+                    <th className="px-6 py-3 font-medium">Qty</th>
+                    <th className="px-6 py-3 font-medium">Issued Date</th>
+                    <th className="px-6 py-3 font-medium">Returned Date</th>
+                    <th className="px-6 py-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {transactions.filter(t => t.status === 'Returned').map((tx) => (
+                    <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors opacity-75">
+                      <td className="px-6 py-4 font-medium text-slate-900">{tx.componentName}</td>
+                      <td className="px-6 py-4 text-slate-600">{tx.quantity}</td>
+                      <td className="px-6 py-4 text-slate-600">{formatDate(tx.issueDate)}</td>
+                      <td className="px-6 py-4 text-slate-600">{formatDate(tx.returnDate)}</td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Returned
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Available Inventory */}
       <div className="glass-card overflow-hidden mt-8">

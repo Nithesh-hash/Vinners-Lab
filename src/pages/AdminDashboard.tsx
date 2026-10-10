@@ -7,12 +7,14 @@ import { AlertCircle, Package2, CheckCircle2, Plus, ArrowRightLeft, Users } from
 import { cn } from '@/lib/utils';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'inventory' | 'transactions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'inventory' | 'transactions' | 'history'>('overview');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [inventory, setInventory] = useState<Component[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editComponent, setEditComponent] = useState<Component | null>(null);
   const [newComponent, setNewComponent] = useState({ name: '', category: '', description: '', quantity: 1, threshold: 0 });
   const [isSeeding, setIsSeeding] = useState(false);
 
@@ -107,6 +109,44 @@ export default function AdminDashboard() {
       setNewComponent({ name: '', category: '', description: '', quantity: 1, threshold: 0 });
     } catch (e) {
       alert("Error adding component");
+    }
+  };
+
+  const handleEditComponent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editComponent) return;
+    try {
+      const batch = writeBatch(db);
+      const docRef = doc(db, 'inventory', editComponent.id);
+      
+      const qtyDiff = Number(editComponent.totalQuantity) - (inventory.find(i => i.id === editComponent.id)?.totalQuantity || 0);
+      
+      batch.update(docRef, {
+        name: editComponent.name,
+        category: editComponent.category,
+        description: editComponent.description,
+        totalQuantity: Number(editComponent.totalQuantity),
+        availableQuantity: (inventory.find(i => i.id === editComponent.id)?.availableQuantity || 0) + qtyDiff,
+        lowStockThreshold: Number(editComponent.lowStockThreshold),
+        updatedAt: Timestamp.now()
+      });
+      await batch.commit();
+      setShowEditModal(false);
+      setEditComponent(null);
+    } catch (e) {
+      alert("Error updating component");
+    }
+  };
+
+  const handleDeleteComponent = async (id: string) => {
+    if (!confirm("Are you sure you want to archive this component?")) return;
+    try {
+      const batch = writeBatch(db);
+      const docRef = doc(db, 'inventory', id);
+      batch.update(docRef, { isArchived: true, updatedAt: Timestamp.now() });
+      await batch.commit();
+    } catch (e) {
+      alert("Error archiving component");
     }
   };
 
@@ -208,11 +248,11 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-slate-200">
         <button onClick={() => setActiveTab('overview')} className={cn("px-4 py-3 font-medium text-sm transition-colors border-b-2", activeTab === 'overview' ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300")}>Overview</button>
-        <button onClick={() => setActiveTab('inventory')} className={cn("px-4 py-3 font-medium text-sm transition-colors border-b-2", activeTab === 'inventory' ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300")}>Inventory</button>
-        <button onClick={() => setActiveTab('transactions')} className={cn("px-4 py-3 font-medium text-sm transition-colors border-b-2", activeTab === 'transactions' ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300")}>Transactions</button>
+        <button onClick={() => setActiveTab('inventory')} className={cn("px-4 py-3 font-medium text-sm transition-colors border-b-2", activeTab === 'inventory' ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300")}>Manage Inventory</button>
+        <button onClick={() => setActiveTab('transactions')} className={cn("px-4 py-3 font-medium text-sm transition-colors border-b-2", activeTab === 'transactions' ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300")}>Active Transactions</button>
+        <button onClick={() => setActiveTab('history')} className={cn("px-4 py-3 font-medium text-sm transition-colors border-b-2", activeTab === 'history' ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300")}>History</button>
       </div>
 
       {activeTab === 'overview' && (
@@ -324,8 +364,10 @@ export default function AdminDashboard() {
                     </td>
                     <td className="px-6 py-4 text-slate-600">{item.issuedQuantity}</td>
                     <td className="px-6 py-4 text-slate-600">{item.totalQuantity}</td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right flex justify-end gap-2">
                       <button onClick={() => { setCheckoutData({ component: item, regNumber: '', quantity: 1, days: 7 }); setShowCheckoutModal(true); }} className="text-brand-600 hover:text-brand-800 font-medium text-xs bg-brand-50 px-3 py-1.5 rounded-md border border-brand-200 transition-colors">Issue</button>
+                      <button onClick={() => { setEditComponent(item); setShowEditModal(true); }} className="text-amber-600 hover:text-amber-800 font-medium text-xs bg-amber-50 px-3 py-1.5 rounded-md border border-amber-200 transition-colors">Edit</button>
+                      <button onClick={() => handleDeleteComponent(item.id)} className="text-red-600 hover:text-red-800 font-medium text-xs bg-red-50 px-3 py-1.5 rounded-md border border-red-200 transition-colors">Archive</button>
                     </td>
                   </tr>
                 ))}
@@ -349,7 +391,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {transactions.map(tx => (
+                {activeTransactions.map(tx => (
                   <tr key={tx.id} className="hover:bg-slate-50/50">
                     <td className="px-6 py-4">
                       <p className="font-medium text-slate-900">{tx.studentName}</p>
@@ -359,7 +401,6 @@ export default function AdminDashboard() {
                     <td className="px-6 py-4 text-slate-600">{tx.quantity}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-md text-xs font-medium border ${
-                        tx.status === 'Returned' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                         tx.status === 'Overdue' || isOverdue(tx.expectedReturnDate) ? 'bg-red-50 text-red-700 border-red-200' :
                         'bg-amber-50 text-amber-700 border-amber-200'
                       }`}>
@@ -367,9 +408,45 @@ export default function AdminDashboard() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {tx.status !== 'Returned' && (
-                        <button onClick={() => handleProcessReturn(tx)} className="text-emerald-600 hover:text-emerald-800 font-medium text-xs bg-emerald-50 px-3 py-1.5 rounded-md border border-emerald-200 transition-colors">Process Return</button>
-                      )}
+                      <button onClick={() => handleProcessReturn(tx)} className="text-emerald-600 hover:text-emerald-800 font-medium text-xs bg-emerald-50 px-3 py-1.5 rounded-md border border-emerald-200 transition-colors">Process Return</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div className="glass-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-50/50 text-slate-600 border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-4 font-medium">Student</th>
+                  <th className="px-6 py-4 font-medium">Component</th>
+                  <th className="px-6 py-4 font-medium">Qty</th>
+                  <th className="px-6 py-4 font-medium">Returned Date</th>
+                  <th className="px-6 py-4 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {transactions.filter(t => t.status === 'Returned').length === 0 ? (
+                  <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">No returned items yet.</td></tr>
+                ) : transactions.filter(t => t.status === 'Returned').map(tx => (
+                  <tr key={tx.id} className="hover:bg-slate-50/50">
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-slate-900">{tx.studentName}</p>
+                      <p className="text-xs text-slate-500">{tx.studentRegNumber}</p>
+                    </td>
+                    <td className="px-6 py-4 text-slate-700">{tx.componentName}</td>
+                    <td className="px-6 py-4 text-slate-600">{tx.quantity}</td>
+                    <td className="px-6 py-4 text-slate-600">{tx.returnDate ? new Date(tx.returnDate.seconds * 1000).toLocaleDateString() : 'N/A'}</td>
+                    <td className="px-6 py-4">
+                      <span className="px-2.5 py-1 rounded-md text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
+                        Returned
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -413,6 +490,46 @@ export default function AdminDashboard() {
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowAddModal(false)} className="glass-button-secondary flex-1 py-2">Cancel</button>
                 <button type="submit" className="glass-button flex-1 py-2">Save Component</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Component Modal */}
+      {showEditModal && editComponent && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h2 className="font-bold text-slate-800">Edit Component</h2>
+              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600">&times;</button>
+            </div>
+            <form onSubmit={handleEditComponent} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
+                <input required type="text" value={editComponent.name} onChange={e => setEditComponent({...editComponent, name: e.target.value})} className="glass-input bg-slate-50 border-slate-200 focus:bg-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                <input required type="text" value={editComponent.category} onChange={e => setEditComponent({...editComponent, category: e.target.value})} className="glass-input bg-slate-50 border-slate-200 focus:bg-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                <input type="text" value={editComponent.description || ''} onChange={e => setEditComponent({...editComponent, description: e.target.value})} className="glass-input bg-slate-50 border-slate-200 focus:bg-white" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Total Quantity</label>
+                  <input required type="number" min={inventory.find(i => i.id === editComponent.id)?.issuedQuantity || 0} value={editComponent.totalQuantity} onChange={e => setEditComponent({...editComponent, totalQuantity: Number(e.target.value)})} className="glass-input bg-slate-50 border-slate-200 focus:bg-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Low Stock Alert At</label>
+                  <input required type="number" min="0" value={editComponent.lowStockThreshold} onChange={e => setEditComponent({...editComponent, lowStockThreshold: Number(e.target.value)})} className="glass-input bg-slate-50 border-slate-200 focus:bg-white" />
+                </div>
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setShowEditModal(false)} className="glass-button-secondary flex-1 py-2">Cancel</button>
+                <button type="submit" className="glass-button flex-1 py-2">Update Component</button>
               </div>
             </form>
           </div>
