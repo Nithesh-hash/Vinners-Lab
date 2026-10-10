@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { collection, query, getDocs, doc, writeBatch, where, Timestamp, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -7,7 +8,16 @@ import { AlertCircle, Package2, CheckCircle2, Plus, ArrowRightLeft, Users } from
 import { cn } from '@/lib/utils';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'inventory' | 'transactions' | 'history'>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'overview';
+  
+  const setActiveTab = (tab: string) => {
+    if (tab === 'overview') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ tab });
+    }
+  };
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [inventory, setInventory] = useState<Component[]>([]);
   const [loading, setLoading] = useState(true);

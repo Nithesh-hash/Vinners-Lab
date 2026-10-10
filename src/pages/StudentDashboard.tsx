@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -6,6 +7,9 @@ import type { Transaction, Component } from '@/types';
 import { Search, AlertCircle, Package2, CheckCircle2 } from 'lucide-react';
 
 export default function StudentDashboard() {
+  const [searchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'overview';
+  
   const { profile, user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [inventory, setInventory] = useState<Component[]>([]);
@@ -74,10 +78,12 @@ export default function StudentDashboard() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Welcome, {profile?.name}</h1>
-        <p className="text-slate-500">Here's your hardware checkout summary.</p>
+        <p className="text-slate-500">{activeTab === 'history' ? 'Your hardware checkout history.' : 'Here\'s your hardware checkout summary.'}</p>
       </div>
 
-      {/* Summary Cards */}
+      {activeTab === 'overview' && (
+        <>
+          {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="glass-card p-5">
           <div className="flex items-center gap-3 mb-2">
@@ -168,9 +174,15 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      {/* History */}
-      {transactions.filter(t => t.status === 'Returned').length > 0 && (
-        <div className="glass-card overflow-hidden mt-8">
+            )}
+          </div>
+        </div>
+        </>
+      )}
+
+      {/* History Tab Content */}
+      {activeTab === 'history' && (
+        <div className="glass-card overflow-hidden">
           <div className="p-5 border-b border-slate-200/60 bg-white/40">
             <h2 className="text-lg font-bold text-slate-800">Past Hardware Returns</h2>
           </div>
@@ -187,7 +199,9 @@ export default function StudentDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {transactions.filter(t => t.status === 'Returned').map((tx) => (
+                  {transactions.filter(t => t.status === 'Returned').length === 0 ? (
+                    <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">No returned items yet.</td></tr>
+                  ) : transactions.filter(t => t.status === 'Returned').map((tx) => (
                     <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors opacity-75">
                       <td className="px-6 py-4 font-medium text-slate-900">{tx.componentName}</td>
                       <td className="px-6 py-4 text-slate-600">{tx.quantity}</td>
@@ -206,48 +220,6 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
-
-      {/* Available Inventory */}
-      <div className="glass-card overflow-hidden mt-8">
-        <div className="p-5 border-b border-slate-200/60 bg-white/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h2 className="text-lg font-bold text-slate-800">Lab Inventory Explorer</h2>
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Search components..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="glass-input pl-9 text-sm py-1.5"
-            />
-          </div>
-        </div>
-        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredInventory.length === 0 ? (
-            <div className="col-span-full py-8 text-center text-slate-500">
-              No components found matching your search.
-            </div>
-          ) : (
-            filteredInventory.map(item => (
-              <div key={item.id} className="border border-slate-200/60 rounded-xl p-4 bg-white/40 hover:bg-white/60 transition-colors flex flex-col">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-bold text-slate-800 line-clamp-1">{item.name}</h3>
-                  <span className={`text-xs font-medium px-2 py-1 rounded-md border ${
-                    item.availableQuantity > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
-                  }`}>
-                    {item.availableQuantity > 0 ? 'In Stock' : 'Out of Stock'}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mb-4 flex-1 line-clamp-2">{item.description || item.category}</p>
-                <div className="mt-auto flex items-center justify-between text-sm bg-slate-50/50 p-2 rounded-lg border border-slate-100">
-                  <span className="text-slate-600">Available</span>
-                  <span className="font-bold text-slate-900">{item.availableQuantity} <span className="text-slate-400 font-normal">/ {item.totalQuantity}</span></span>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
     </div>
   );
 }

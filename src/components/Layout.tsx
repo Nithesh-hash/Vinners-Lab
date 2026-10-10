@@ -28,16 +28,16 @@ export default function Layout() {
         </div>
         
         <nav className="flex-1 space-y-2">
-          <Link to={dashboardPath} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors", location.pathname === dashboardPath ? "bg-brand-50 text-brand-700 shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}>
+          <Link to={dashboardPath} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors", (location.pathname === dashboardPath && !location.search.includes('tab=')) ? "bg-brand-50 text-brand-700 shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}>
             <LayoutDashboard className="w-5 h-5" />
             Dashboard
           </Link>
-          <Link to="#" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium transition-colors">
+          <Link to={`${dashboardPath}?tab=history`} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors", location.search.includes('tab=history') ? "bg-brand-50 text-brand-700 shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}>
             <History className="w-5 h-5" />
             History
           </Link>
           {isAdmin && (
-            <Link to="#" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium transition-colors">
+            <Link to={`${dashboardPath}?tab=inventory`} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors", location.search.includes('tab=inventory') ? "bg-brand-50 text-brand-700 shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}>
               <Settings className="w-5 h-5" />
               Manage Inventory
             </Link>
@@ -106,16 +106,16 @@ export default function Layout() {
               </button>
             </div>
             <nav className="space-y-2 flex-1">
-              <Link to={dashboardPath} onClick={() => setIsMobileMenuOpen(false)} className={cn("flex items-center gap-3 p-3 rounded-lg font-medium", location.pathname === dashboardPath ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-50")}>
+              <Link to={dashboardPath} onClick={() => setIsMobileMenuOpen(false)} className={cn("flex items-center gap-3 p-3 rounded-lg font-medium", (location.pathname === dashboardPath && !location.search.includes('tab=')) ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-50")}>
                 <LayoutDashboard className="w-5 h-5" />
                 Dashboard
               </Link>
-              <Link to="#" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg text-slate-600 hover:bg-slate-50 font-medium">
+              <Link to={`${dashboardPath}?tab=history`} onClick={() => setIsMobileMenuOpen(false)} className={cn("flex items-center gap-3 p-3 rounded-lg font-medium", location.search.includes('tab=history') ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-50")}>
                 <History className="w-5 h-5" />
                 History
               </Link>
               {isAdmin && (
-                <Link to="#" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg text-slate-600 hover:bg-slate-50 font-medium">
+                <Link to={`${dashboardPath}?tab=inventory`} onClick={() => setIsMobileMenuOpen(false)} className={cn("flex items-center gap-3 p-3 rounded-lg font-medium", location.search.includes('tab=inventory') ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-50")}>
                   <Settings className="w-5 h-5" />
                   Manage Inventory
                 </Link>
