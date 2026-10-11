@@ -241,30 +241,39 @@ export default function ReturnLoan() {
         });
 
         // Prepare return log record
+        const cleanNotes = adminNotes.trim();
         const logEntry: ReturnLogEntry = {
           returnDate: Timestamp.now(),
           returnedQuantity: returnQty,
           condition,
-          adminNotes: adminNotes.trim() || undefined,
           adminId: profile.uid,
-          adminName: profile.name || 'Lab Admin',
-          adminEmail: profile.email
+          adminName: profile.name || 'Lab Admin'
         };
+        if (cleanNotes) {
+          logEntry.adminNotes = cleanNotes;
+        }
+        if (profile.email) {
+          logEntry.adminEmail = profile.email;
+        }
 
         const existingLogs = currentTx.returnsLog || [];
         const newLogs = [...existingLogs, logEntry];
 
         // Atomically update loan transaction
-        txn.update(txRef, {
+        const updateTxPayload: Record<string, any> = {
           returnedQuantity: newReturnedTotal,
           status: finalStatus,
           returnDate: Timestamp.now(),
           returnedByAdminId: profile.uid,
           returnedByAdminName: profile.name || 'Lab Admin',
           condition,
-          adminNotes: adminNotes.trim() || undefined,
           returnsLog: newLogs
-        });
+        };
+        if (cleanNotes) {
+          updateTxPayload.adminNotes = cleanNotes;
+        }
+
+        txn.update(txRef, updateTxPayload);
       });
 
       // Update local view state
