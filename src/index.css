@@ -11,6 +11,14 @@
 }
 
 @layer utilities {
+  .bg-dot-grid {
+    background-color: #fbfcfd;
+    background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px);
+    background-size: 22px 22px;
+  }
+  .ui-card {
+    @apply bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)];
+  }
   .glass {
     @apply bg-white/70 backdrop-blur-md border border-white/40 shadow-[0_4px_30px_rgba(0,0,0,0.05)];
   }

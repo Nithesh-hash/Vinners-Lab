@@ -23,7 +23,11 @@ service cloud.firestore {
     }
 
     match /transactions/{transactionId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.studentId == request.auth.uid ||
+        resource.data.studentRegNumber == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.regNumber
+      );
       allow write: if isAdmin();
     }
   }
