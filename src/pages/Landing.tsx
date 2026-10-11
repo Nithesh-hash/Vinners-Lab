@@ -1,8 +1,31 @@
-import { Link } from 'react-router-dom';
-import { ArrowRight, Download } from 'lucide-react';
+import { Link, Navigate } from 'react-router-dom';
+import { Download } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+
+function FingerprintIcon({ className = "w-6 h-6" }: { className?: string }) {
+  return (
+    <svg 
+      className={className} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
+      <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+      <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+      <path d="M2 12a10 10 0 0 1 18-6" />
+      <path d="M2 16h.01" />
+      <path d="M21.8 16c.2-2 .131-5.354 0-6" />
+      <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
+      <path d="M8.65 22c.21-.66.45-1.32.57-2" />
+      <path d="M9 6.8a6 6 0 0 1 9 5.2v2" />
+    </svg>
+  );
+}
 
 export default function Landing() {
   const { user, profile, loading } = useAuth();
@@ -52,9 +75,9 @@ export default function Landing() {
           <img src="/logo.png" alt="Vinner Lab Logo" className="w-10 h-10 rounded-lg shadow-sm" />
           <span className="text-2xl font-bold text-slate-900 tracking-tight">Vinner Lab</span>
         </div>
-        <div className="flex gap-4">
-          <Link to="/login" className="px-5 py-2 text-slate-700 font-medium hover:text-brand-600 transition-colors">Log In</Link>
-          <Link to="/register" className="glass-button hidden sm:block">Register</Link>
+        <div className="flex items-center gap-3 sm:gap-4">
+          <Link to="/login" className="px-4 py-2 text-slate-700 font-medium hover:text-brand-600 transition-colors text-sm sm:text-base">Log In</Link>
+          <Link to="/register" className="hidden sm:inline-flex items-center px-5 py-2 rounded-full bg-white/60 hover:bg-white/80 text-slate-700 font-medium text-sm border border-slate-300/60 shadow-xs backdrop-blur-md transition-all">Register</Link>
         </div>
       </header>
 
@@ -65,13 +88,26 @@ export default function Landing() {
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight">Vinner Lab</h1>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <Link to="/register" className="glass-button w-full sm:w-auto flex items-center justify-center gap-2 text-base sm:text-lg px-6 sm:px-8 py-3.5 sm:py-4">
-              Student Registration
-              <ArrowRight className="w-5 h-5" />
+          {/* Frosted Glass Pill Capsule Buttons Stacked Vertically */}
+          <div className="flex flex-col items-center justify-center gap-3.5 sm:gap-4 w-full">
+            <Link 
+              to="/register" 
+              className="group relative w-full max-w-[280px] sm:max-w-[320px] py-3.5 px-6 sm:px-8 rounded-full bg-white/50 hover:bg-white/75 active:bg-white/90 backdrop-blur-xl border border-slate-300/70 ring-1 ring-white/70 shadow-[0_4px_20px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.07),inset_0_1px_2px_rgba(255,255,255,0.95)] flex items-center justify-center gap-3 transition-all duration-200 cursor-pointer active:scale-[0.98]"
+            >
+              <FingerprintIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500 group-hover:text-slate-700 transition-colors shrink-0" />
+              <span className="text-base sm:text-lg font-medium text-slate-700 group-hover:text-slate-900 tracking-tight transition-colors">
+                Student Registration
+              </span>
             </Link>
-            <Link to="/login" className="glass-button-secondary w-full sm:w-auto flex items-center justify-center gap-2 text-base sm:text-lg px-6 sm:px-8 py-3.5 sm:py-4">
-              Admin Login
+
+            <Link 
+              to="/login" 
+              className="group relative w-full max-w-[280px] sm:max-w-[320px] py-3.5 px-6 sm:px-8 rounded-full bg-white/50 hover:bg-white/75 active:bg-white/90 backdrop-blur-xl border border-slate-300/70 ring-1 ring-white/70 shadow-[0_4px_20px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.07),inset_0_1px_2px_rgba(255,255,255,0.95)] flex items-center justify-center gap-3 transition-all duration-200 cursor-pointer active:scale-[0.98]"
+            >
+              <FingerprintIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500 group-hover:text-slate-700 transition-colors shrink-0" />
+              <span className="text-base sm:text-lg font-medium text-slate-700 group-hover:text-slate-900 tracking-tight transition-colors">
+                Admin Login
+              </span>
             </Link>
           </div>
         </div>
