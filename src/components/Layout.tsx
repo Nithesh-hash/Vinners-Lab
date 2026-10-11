@@ -79,22 +79,23 @@ export default function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-h-screen max-w-full overflow-hidden">
+      <main className="flex-1 flex flex-col min-h-dvh min-w-0 max-w-full overflow-x-hidden">
         {/* Mobile Header */}
-        <header className="md:hidden flex items-center justify-between p-4 bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-20">
-          <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Vinner Lab Logo" className="w-7 h-7 rounded-lg shadow-xs border border-slate-200" />
-            <span className="text-base font-bold text-slate-900 tracking-tight">Vinner Lab</span>
+        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <img src="/logo.png" alt="Vinner Lab Logo" className="w-7 h-7 rounded-lg shadow-xs border border-slate-200 shrink-0" />
+            <span className="text-base font-extrabold text-slate-900 tracking-tight">Vinner Lab</span>
           </div>
           <button 
-            className="p-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition-colors"
+            className="p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl border border-slate-200 transition-all cursor-pointer"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle navigation menu"
           >
             <Menu className="w-4 h-4" />
           </button>
         </header>
         
-        <div className="flex-1 p-4 md:p-8 overflow-auto">
+        <div className="flex-1 px-3.5 py-4 sm:px-6 md:p-8 overflow-y-auto overflow-x-hidden">
           <div className="max-w-6xl mx-auto w-full">
             <Outlet />
           </div>
@@ -103,8 +104,14 @@ export default function Layout() {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex justify-end transition-opacity">
-          <div className="w-72 h-full bg-white shadow-2xl p-4 flex flex-col transform transition-transform animate-in slide-in-from-right duration-200">
+        <div 
+          className="md:hidden fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          <div 
+            className="w-72 max-w-[85vw] h-full bg-white shadow-2xl p-4 flex flex-col transform transition-transform animate-in slide-in-from-right duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-center mb-8">
               <div className="flex items-center gap-3 px-2">
                 <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold">

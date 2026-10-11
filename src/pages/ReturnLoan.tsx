@@ -323,10 +323,10 @@ export default function ReturnLoan() {
 
       {/* Success Notification Banner */}
       {returnSuccess && lastReturnedDetails && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 text-emerald-950 animate-in zoom-in-95 duration-200 shadow-xs">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <CheckCircle2 className="w-6 h-6" />
+        <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-4 sm:p-6 text-emerald-950 animate-in zoom-in-95 duration-200 shadow-xs">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div className="flex-1">
               <h2 className="text-base font-extrabold text-emerald-900">Return Successfully Processed</h2>
@@ -407,8 +407,8 @@ export default function ReturnLoan() {
             </div>
 
             <div>
-              <h2 className="text-xl font-extrabold text-slate-900">{transaction.componentName}</h2>
-              <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 break-words">{transaction.componentName}</h2>
+              <div className="flex items-center flex-wrap gap-2 mt-1 text-xs text-slate-500">
                 <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-700">
                   ID: {transaction.componentId}
                 </span>
@@ -428,30 +428,30 @@ export default function ReturnLoan() {
             </div>
 
             {/* Inventory figures audit breakdown */}
-            <div className="grid grid-cols-3 gap-2.5 pt-3 border-t border-slate-100">
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/60">
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Originally Issued</span>
-                <span className="text-xl font-extrabold text-slate-900">{transaction.quantity}</span>
+            <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-3 border-t border-slate-100 text-center sm:text-left">
+              <div className="p-2 sm:p-3 bg-slate-50 rounded-2xl border border-slate-200/60 min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 uppercase tracking-wider block truncate">Originally Issued</span>
+                <span className="text-base sm:text-xl font-extrabold text-slate-900">{transaction.quantity}</span>
               </div>
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/60">
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Already Returned</span>
-                <span className="text-xl font-extrabold text-emerald-600">{alreadyReturned}</span>
+              <div className="p-2 sm:p-3 bg-slate-50 rounded-2xl border border-slate-200/60 min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 uppercase tracking-wider block truncate">Already Returned</span>
+                <span className="text-base sm:text-xl font-extrabold text-emerald-600">{alreadyReturned}</span>
               </div>
-              <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200/60">
-                <span className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider block">Still Outstanding</span>
-                <span className="text-xl font-black text-amber-900">{outstandingQuantity}</span>
+              <div className="p-2 sm:p-3 bg-amber-50/70 rounded-2xl border border-amber-200/60 min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-semibold text-amber-700 uppercase tracking-wider block truncate">Outstanding</span>
+                <span className="text-base sm:text-xl font-black text-amber-900">{outstandingQuantity}</span>
               </div>
             </div>
 
             {/* Timestamps */}
-            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100 text-xs text-slate-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 pt-3 border-t border-slate-100 text-xs text-slate-600">
               <div className="flex items-center gap-2">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span>Issued: <strong>{formatDate(transaction.issueDate)}</strong></span>
+                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span className="truncate">Issued: <strong>{formatDate(transaction.issueDate)}</strong></span>
               </div>
               <div className="flex items-center gap-2">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span>Due Date: <strong>{formatDate(transaction.expectedReturnDate)}</strong></span>
+                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span className="truncate">Due Date: <strong>{formatDate(transaction.expectedReturnDate)}</strong></span>
               </div>
             </div>
           </div>
@@ -485,7 +485,7 @@ export default function ReturnLoan() {
 
         {/* Right Column: Return Processing Form */}
         <div className="lg:col-span-5">
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-xs sticky top-6">
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs lg:sticky lg:top-6">
             <h3 className="text-sm font-bold text-slate-900 mb-1">Process Hardware Return</h3>
             <p className="text-xs text-slate-500 mb-5">
               Verify the hardware units in hand before confirming return transaction.
@@ -660,8 +660,8 @@ export default function ReturnLoan() {
 
       {/* Confirmation Modal to prevent accidental clicks */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-sm w-full max-h-[92dvh] overflow-y-auto p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-900">
               <CheckCircle2 className="w-6 h-6" />
             </div>

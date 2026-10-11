@@ -61,8 +61,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
-      <div className="w-full max-w-[440px] bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 md:p-10 border border-slate-100">
+    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-3 sm:p-4">
+      <div className="w-full max-w-[440px] bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 sm:p-8 md:p-10 border border-slate-100">
         
         {/* Toggle */}
         <div className="flex p-1 bg-slate-100/80 rounded-lg mb-8">
@@ -84,7 +84,7 @@ export default function Login() {
 
         <div className="mb-8">
           <p className="text-slate-500 text-sm mb-1">Please enter your details</p>
-          <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome back</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Welcome back</h2>
         </div>
 
         {error && (
@@ -124,7 +124,7 @@ export default function Login() {
             />
           </div>
 
-          <div className="flex items-center justify-between pt-1">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pt-1">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
               <span className="text-sm text-slate-600">Remember for 30 days</span>
@@ -132,7 +132,7 @@ export default function Login() {
             <button 
               type="button"
               onClick={handleResetPassword}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline"
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline text-left sm:text-right"
             >
               Forgot password
             </button>

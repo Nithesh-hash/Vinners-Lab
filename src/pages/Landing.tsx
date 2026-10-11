@@ -47,7 +47,7 @@ export default function Landing() {
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-200/50 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-brand-300/40 rounded-full blur-3xl pointer-events-none"></div>
       
-      <header className="p-6 md:p-8 flex items-center justify-between z-10">
+      <header className="p-4 sm:p-6 md:p-8 flex items-center justify-between z-10">
         <div className="flex items-center gap-3">
           <img src="/logo.png" alt="Vinner Lab Logo" className="w-10 h-10 rounded-lg shadow-sm" />
           <span className="text-2xl font-bold text-slate-900 tracking-tight">Vinner Lab</span>
@@ -58,19 +58,19 @@ export default function Landing() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10">
-        <div className="max-w-xl w-full space-y-10">
-          <div className="flex flex-col items-center justify-center space-y-6">
-            <img src="/logo.png" alt="Vinner Lab Logo" className="w-40 h-40 rounded-3xl shadow-xl border-4 border-white bg-white" />
-            <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight">Vinner Lab</h1>
+      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 text-center z-10">
+        <div className="max-w-xl w-full space-y-8 sm:space-y-10">
+          <div className="flex flex-col items-center justify-center space-y-4 sm:space-y-6">
+            <img src="/logo.png" alt="Vinner Lab Logo" className="w-28 h-28 sm:w-40 sm:h-40 rounded-3xl shadow-xl border-4 border-white bg-white" />
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight">Vinner Lab</h1>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/register" className="glass-button w-full sm:w-auto flex items-center justify-center gap-2 text-lg px-8 py-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+            <Link to="/register" className="glass-button w-full sm:w-auto flex items-center justify-center gap-2 text-base sm:text-lg px-6 sm:px-8 py-3.5 sm:py-4">
               Student Registration
               <ArrowRight className="w-5 h-5" />
             </Link>
-            <Link to="/login" className="glass-button-secondary w-full sm:w-auto flex items-center justify-center gap-2 text-lg px-8 py-4">
+            <Link to="/login" className="glass-button-secondary w-full sm:w-auto flex items-center justify-center gap-2 text-base sm:text-lg px-6 sm:px-8 py-3.5 sm:py-4">
               Admin Login
             </Link>
           </div>

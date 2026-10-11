@@ -63,12 +63,12 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
-      <div className="w-full max-w-[440px] bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 md:p-10 border border-slate-100">
+    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-3 sm:p-4">
+      <div className="w-full max-w-[440px] bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 sm:p-8 md:p-10 border border-slate-100">
         
         <div className="mb-8">
           <p className="text-slate-500 text-sm mb-1">Create an account</p>
-          <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Student Registration</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Student Registration</h2>
         </div>
 
         {error && (

@@ -281,12 +281,12 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
           {inventory.length === 0 && (
             <button 
               onClick={handleSeedInventory} 
               disabled={isSeeding}
-              className="px-4 py-2.5 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition-all shadow-2xs"
+              className="px-4 py-2.5 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-xs transition-all shadow-2xs w-full sm:w-auto text-center"
             >
               {isSeeding ? 'Seeding...' : 'Seed Sample Catalog'}
             </button>
@@ -294,17 +294,17 @@ export default function AdminDashboard() {
 
           <button 
             onClick={() => navigate('/admin/scan')}
-            className="border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 rounded-full px-5 py-3 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-2xs transition-all hover:scale-[1.01] active:scale-[0.99] whitespace-nowrap cursor-pointer"
+            className="border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 rounded-full px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-2xs transition-all hover:scale-[1.01] active:scale-[0.99] whitespace-nowrap cursor-pointer w-full sm:w-auto"
           >
-            <QrCode className="w-4 h-4 text-slate-700" />
+            <QrCode className="w-4 h-4 text-slate-700 shrink-0" />
             Scan Return QR
           </button>
 
           <button 
             onClick={() => setShowAddModal(true)}
-            className="bg-black hover:bg-neutral-800 text-white rounded-full px-5 py-3 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] whitespace-nowrap cursor-pointer"
+            className="bg-black hover:bg-neutral-800 text-white rounded-full px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] whitespace-nowrap cursor-pointer w-full sm:w-auto"
           >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <Plus className="w-4 h-4 stroke-[2.5] shrink-0" />
             Add Lab Component
           </button>
         </div>
@@ -358,7 +358,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* NAVIGATION PILL TABS */}
-      <div className="flex items-center gap-2 pt-2 border-b border-slate-200/80 pb-3 overflow-x-auto">
+      <div className="flex items-center gap-2 pt-2 border-b border-slate-200/80 pb-3 overflow-x-auto no-scrollbar -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
         <button 
           onClick={() => setActiveTab('inventory')} 
           className={cn(
@@ -629,40 +629,40 @@ export default function AdminDashboard() {
 
       {/* MODAL 1: ADD COMPONENT */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200/90 animate-in zoom-in-95 duration-150">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="text-lg font-extrabold text-slate-900">Add Lab Component</h3>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md max-h-[92dvh] flex flex-col overflow-hidden border border-slate-200/90 animate-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900">Add Lab Component</h3>
               <button onClick={() => setShowAddModal(false)} className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleAddComponent} className="p-6 space-y-4">
+            <form onSubmit={handleAddComponent} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Component Name</label>
-                <input required type="text" placeholder="e.g. ESP32-S3 Dev Board" value={newComponent.name} onChange={e => setNewComponent({...newComponent, name: e.target.value})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                <input required type="text" placeholder="e.g. ESP32-S3 Dev Board" value={newComponent.name} onChange={e => setNewComponent({...newComponent, name: e.target.value})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Category</label>
-                  <input required type="text" placeholder="Microcontrollers, SBC, Sensors" value={newComponent.category} onChange={e => setNewComponent({...newComponent, category: e.target.value})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                  <input required type="text" placeholder="Microcontrollers, Sensors" value={newComponent.category} onChange={e => setNewComponent({...newComponent, category: e.target.value})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Initial Units</label>
-                  <input required type="number" min="1" value={newComponent.quantity} onChange={e => setNewComponent({...newComponent, quantity: Number(e.target.value)})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                  <input required type="number" min="1" value={newComponent.quantity} onChange={e => setNewComponent({...newComponent, quantity: Number(e.target.value)})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Low Stock Threshold</label>
-                <input required type="number" min="0" value={newComponent.threshold} onChange={e => setNewComponent({...newComponent, threshold: Number(e.target.value)})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                <input required type="number" min="0" value={newComponent.threshold} onChange={e => setNewComponent({...newComponent, threshold: Number(e.target.value)})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Description & Specifications</label>
-                <textarea rows={2} value={newComponent.description} onChange={e => setNewComponent({...newComponent, description: e.target.value})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                <textarea rows={2} value={newComponent.description} onChange={e => setNewComponent({...newComponent, description: e.target.value})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
               </div>
-              <div className="pt-2 flex justify-end gap-2">
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-full border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">Cancel</button>
-                <button type="submit" className="px-5 py-2 rounded-full bg-black text-white text-xs font-semibold hover:bg-neutral-800 shadow-sm cursor-pointer">Save Component</button>
+              <div className="pt-2 flex justify-end gap-2 shrink-0">
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 sm:flex-initial px-4 py-2.5 rounded-full border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">Cancel</button>
+                <button type="submit" className="flex-1 sm:flex-initial px-5 py-2.5 rounded-full bg-black text-white text-xs font-semibold hover:bg-neutral-800 shadow-sm cursor-pointer">Save Component</button>
               </div>
             </form>
           </div>
@@ -671,40 +671,40 @@ export default function AdminDashboard() {
 
       {/* MODAL 2: EDIT COMPONENT */}
       {showEditModal && editComponent && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200/90 animate-in zoom-in-95 duration-150">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="text-lg font-extrabold text-slate-900">Edit Component</h3>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md max-h-[92dvh] flex flex-col overflow-hidden border border-slate-200/90 animate-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900">Edit Component</h3>
               <button onClick={() => setShowEditModal(false)} className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleEditComponent} className="p-6 space-y-4">
+            <form onSubmit={handleEditComponent} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Name</label>
-                <input required type="text" value={editComponent.name} onChange={e => setEditComponent({...editComponent, name: e.target.value})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                <input required type="text" value={editComponent.name} onChange={e => setEditComponent({...editComponent, name: e.target.value})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Category</label>
-                  <input required type="text" value={editComponent.category} onChange={e => setEditComponent({...editComponent, category: e.target.value})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                  <input required type="text" value={editComponent.category} onChange={e => setEditComponent({...editComponent, category: e.target.value})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Total Quantity</label>
-                  <input required type="number" min="1" value={editComponent.totalQuantity} onChange={e => setEditComponent({...editComponent, totalQuantity: Number(e.target.value)})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                  <input required type="number" min="1" value={editComponent.totalQuantity} onChange={e => setEditComponent({...editComponent, totalQuantity: Number(e.target.value)})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Low Stock Threshold</label>
-                <input required type="number" min="0" value={editComponent.lowStockThreshold} onChange={e => setEditComponent({...editComponent, lowStockThreshold: Number(e.target.value)})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                <input required type="number" min="0" value={editComponent.lowStockThreshold} onChange={e => setEditComponent({...editComponent, lowStockThreshold: Number(e.target.value)})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Description</label>
-                <textarea rows={2} value={editComponent.description} onChange={e => setEditComponent({...editComponent, description: e.target.value})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                <textarea rows={2} value={editComponent.description} onChange={e => setEditComponent({...editComponent, description: e.target.value})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
               </div>
-              <div className="pt-2 flex justify-end gap-2">
-                <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 rounded-full border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">Cancel</button>
-                <button type="submit" className="px-5 py-2 rounded-full bg-black text-white text-xs font-semibold hover:bg-neutral-800 shadow-sm cursor-pointer">Save Changes</button>
+              <div className="pt-2 flex justify-end gap-2 shrink-0">
+                <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 sm:flex-initial px-4 py-2.5 rounded-full border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">Cancel</button>
+                <button type="submit" className="flex-1 sm:flex-initial px-5 py-2.5 rounded-full bg-black text-white text-xs font-semibold hover:bg-neutral-800 shadow-sm cursor-pointer">Save Changes</button>
               </div>
             </form>
           </div>
@@ -713,38 +713,38 @@ export default function AdminDashboard() {
 
       {/* MODAL 3: ISSUE / CHECKOUT TO STUDENT */}
       {showCheckoutModal && checkoutData.component && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200/90 animate-in zoom-in-95 duration-150">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md max-h-[92dvh] flex flex-col overflow-hidden border border-slate-200/90 animate-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
               <div>
-                <h3 className="text-lg font-extrabold text-slate-900">Issue Hardware</h3>
+                <h3 className="text-base sm:text-lg font-extrabold text-slate-900">Issue Hardware</h3>
                 <p className="text-xs text-slate-500">{checkoutData.component.name}</p>
               </div>
               <button onClick={() => setShowCheckoutModal(false)} className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleCheckout} className="p-6 space-y-4">
+            <form onSubmit={handleCheckout} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Student Registration Number</label>
-                <input required type="text" placeholder="e.g. 21BCE1042" value={checkoutData.regNumber} onChange={e => setCheckoutData({...checkoutData, regNumber: e.target.value})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 uppercase focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                <input required type="text" placeholder="e.g. 21BCE1042" value={checkoutData.regNumber} onChange={e => setCheckoutData({...checkoutData, regNumber: e.target.value})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 uppercase focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Quantity</label>
-                  <input required type="number" min="1" max={checkoutData.component.availableQuantity} value={checkoutData.quantity} onChange={e => setCheckoutData({...checkoutData, quantity: Number(e.target.value)})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                  <input required type="number" min="1" max={checkoutData.component.availableQuantity} value={checkoutData.quantity} onChange={e => setCheckoutData({...checkoutData, quantity: Number(e.target.value)})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Loan Duration (Days)</label>
-                  <input required type="number" min="1" max="90" value={checkoutData.days} onChange={e => setCheckoutData({...checkoutData, days: Number(e.target.value)})} className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
+                  <input required type="number" min="1" max="90" value={checkoutData.days} onChange={e => setCheckoutData({...checkoutData, days: Number(e.target.value)})} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black" />
                 </div>
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/60 text-xs text-slate-500">
                 Available stock for loan: <strong className="text-slate-900">{checkoutData.component.availableQuantity} units</strong>
               </div>
-              <div className="pt-2 flex justify-end gap-2">
-                <button type="button" onClick={() => setShowCheckoutModal(false)} className="px-4 py-2 rounded-full border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">Cancel</button>
-                <button type="submit" className="px-5 py-2 rounded-full bg-black text-white text-xs font-semibold hover:bg-neutral-800 shadow-sm cursor-pointer">Confirm Checkout</button>
+              <div className="pt-2 flex justify-end gap-2 shrink-0">
+                <button type="button" onClick={() => setShowCheckoutModal(false)} className="flex-1 sm:flex-initial px-4 py-2.5 rounded-full border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">Cancel</button>
+                <button type="submit" className="flex-1 sm:flex-initial px-5 py-2.5 rounded-full bg-black text-white text-xs font-semibold hover:bg-neutral-800 shadow-sm cursor-pointer">Confirm Checkout</button>
               </div>
             </form>
           </div>

@@ -105,48 +105,48 @@ export default function StudentDashboard() {
       {activeTab === 'overview' && (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="glass-card p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="glass-card p-4 sm:p-5">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-brand-100 text-brand-600 rounded-lg">
                   <Package2 className="w-5 h-5" />
                 </div>
-                <h3 className="font-medium text-slate-700">Currently Issued</h3>
+                <h3 className="font-medium text-slate-700 text-sm">Currently Issued</h3>
               </div>
-              <p className="text-3xl font-bold text-slate-900">{totalCheckedOut}</p>
-              <p className="text-sm text-slate-500 mt-1">Total components in possession</p>
+              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{totalCheckedOut}</p>
+              <p className="text-xs text-slate-500 mt-1">Total components in possession</p>
             </div>
             
-            <div className="glass-card p-5">
+            <div className="glass-card p-4 sm:p-5">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
                   <CheckCircle2 className="w-5 h-5" />
                 </div>
-                <h3 className="font-medium text-slate-700">Active Checkouts</h3>
+                <h3 className="font-medium text-slate-700 text-sm">Active Checkouts</h3>
               </div>
-              <p className="text-3xl font-bold text-slate-900">{activeTransactions.length}</p>
-              <p className="text-sm text-slate-500 mt-1">Ongoing transaction records</p>
+              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{activeTransactions.length}</p>
+              <p className="text-xs text-slate-500 mt-1">Ongoing transaction records</p>
             </div>
 
-            <div className="glass-card p-5">
+            <div className="glass-card p-4 sm:p-5">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
                   <AlertCircle className="w-5 h-5" />
                 </div>
-                <h3 className="font-medium text-slate-700">Overdue Items</h3>
+                <h3 className="font-medium text-slate-700 text-sm">Overdue Items</h3>
               </div>
-              <p className="text-3xl font-bold text-amber-600">
+              <p className="text-2xl sm:text-3xl font-bold text-amber-600">
                 {activeTransactions.filter(t => t.status === 'Overdue' || isOverdue(t.expectedReturnDate)).length}
               </p>
-              <p className="text-sm text-slate-500 mt-1">Requires immediate return</p>
+              <p className="text-xs text-slate-500 mt-1">Requires immediate return</p>
             </div>
           </div>
 
           {/* Active Transactions & My Loans */}
           <div className="glass-card overflow-hidden">
-            <div className="p-5 border-b border-slate-200/60 bg-white/40 flex justify-between items-center">
+            <div className="p-4 sm:p-5 border-b border-slate-200/60 bg-white/40 flex justify-between items-center">
               <div>
-                <h2 className="text-lg font-bold text-slate-800">Your Issued Components (My Loans)</h2>
+                <h2 className="text-base sm:text-lg font-bold text-slate-800">Your Issued Components (My Loans)</h2>
                 <p className="text-xs text-slate-500 mt-0.5">Click "Show Return QR" to generate instant verification for the Lab Admin</p>
               </div>
             </div>
@@ -224,12 +224,12 @@ export default function StudentDashboard() {
                       const outstanding = tx.quantity - (tx.returnedQuantity || 0);
                       const isPartiallyReturned = (tx.returnedQuantity || 0) > 0 && outstanding > 0;
                       return (
-                        <div key={tx.id} className="p-4 space-y-3">
+                        <div key={tx.id} className="p-3.5 sm:p-4 space-y-3">
                           <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h3 className="font-extrabold text-slate-900 text-base">{tx.componentName}</h3>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-extrabold text-slate-900 text-sm sm:text-base break-words">{tx.componentName}</h3>
                             </div>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
                               overdue ? 'bg-red-100 text-red-800 border border-red-200' : 
                               isPartiallyReturned ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
                               'bg-amber-100 text-amber-800 border border-amber-200'
@@ -317,11 +317,12 @@ export default function StudentDashboard() {
       {/* History Tab Content */}
       {activeTab === 'history' && (
         <div className="glass-card overflow-hidden">
-          <div className="p-5 border-b border-slate-200/60 bg-white/40">
-            <h2 className="text-lg font-bold text-slate-800">Past Hardware Returns</h2>
+          <div className="p-4 sm:p-5 border-b border-slate-200/60 bg-white/40">
+            <h2 className="text-base sm:text-lg font-bold text-slate-800">Past Hardware Returns</h2>
           </div>
           <div className="p-0">
-            <div className="overflow-x-auto">
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-slate-50/50 text-slate-600">
                   <tr>
@@ -350,6 +351,37 @@ export default function StudentDashboard() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {transactions.filter(t => t.status === 'Returned').length === 0 ? (
+                <div className="p-6 text-center text-slate-500 text-xs">No returned items yet.</div>
+              ) : (
+                transactions.filter(t => t.status === 'Returned').map((tx) => (
+                  <div key={tx.id} className="p-3.5 sm:p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-bold text-slate-900 text-sm break-words">{tx.componentName}</h3>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                        Returned
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">Units Returned</span>
+                        <span className="font-bold text-slate-800">{tx.quantity}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">Returned Date</span>
+                        <span className="font-medium text-slate-700">{formatDate(tx.returnDate)}</span>
+                      </div>
+                      <div className="col-span-2 text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+                        Issued on {formatDate(tx.issueDate)}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

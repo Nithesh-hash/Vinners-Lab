@@ -66,52 +66,52 @@ export default function ReturnQRModal({ transaction, onClose }: ReturnQRModalPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200">
       {isFullscreen ? (
         /* Fullscreen QR Presentation Mode for Fast Scanning */
-        <div className="fixed inset-0 z-60 bg-white flex flex-col items-center justify-between p-6 sm:p-10 text-slate-900 select-none">
+        <div className="fixed inset-0 z-60 bg-white flex flex-col items-center justify-between p-4 sm:p-8 text-slate-900 select-none overflow-y-auto">
           <div className="w-full flex items-center justify-between max-w-md">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">LabSlot Return Pass</span>
-              <h2 className="text-xl font-extrabold text-slate-900 line-clamp-1">{transaction.componentName}</h2>
+            <div className="pr-2 min-w-0">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">LabSlot Return Pass</span>
+              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 truncate">{transaction.componentName}</h2>
             </div>
             <button
               onClick={() => setIsFullscreen(false)}
-              className="p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+              className="p-2 sm:p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors shrink-0 cursor-pointer"
               title="Exit Fullscreen"
             >
-              <Minimize2 className="w-5 h-5" />
+              <Minimize2 className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
 
-          <div className="flex flex-col items-center justify-center my-auto">
-            <div className="p-4 bg-white rounded-3xl border-4 border-slate-900 shadow-2xl flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center my-auto py-4">
+            <div className="p-3 sm:p-4 bg-white rounded-3xl border-3 sm:border-4 border-slate-900 shadow-2xl flex items-center justify-center max-w-[85vw] max-h-[55vh]">
               {qrUrl ? (
                 <img
                   src={qrUrl}
                   alt="Loan Return QR"
-                  className="w-72 h-72 sm:w-88 sm:h-88 object-contain"
+                  className="w-56 h-56 sm:w-80 sm:h-80 max-w-[75vw] max-h-[50vh] object-contain"
                 />
               ) : (
-                <div className="w-72 h-72 flex items-center justify-center">
+                <div className="w-56 h-56 flex items-center justify-center">
                   <div className="w-8 h-8 border-3 border-slate-900 border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
             </div>
-            <div className="mt-6 text-center">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Outstanding Units</p>
-              <p className="text-3xl font-black text-slate-900">{outstanding} of {transaction.quantity}</p>
-              <p className="text-xs font-mono text-slate-400 mt-1">ID: {transaction.id}</p>
+            <div className="mt-4 sm:mt-6 text-center">
+              <p className="text-[11px] sm:text-xs font-semibold text-slate-500 uppercase tracking-widest">Outstanding Units</p>
+              <p className="text-2xl sm:text-3xl font-black text-slate-900">{outstanding} of {transaction.quantity}</p>
+              <p className="text-[10px] sm:text-xs font-mono text-slate-400 mt-0.5 truncate max-w-[280px]">ID: {transaction.id}</p>
             </div>
           </div>
 
-          <div className="w-full max-w-md text-center">
-            <p className="text-xs text-slate-500 font-medium">
+          <div className="w-full max-w-md text-center pt-2">
+            <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
               Hold device steady for the Lab Admin scanner
             </p>
             <button
               onClick={() => setIsFullscreen(false)}
-              className="mt-3 w-full py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-xs transition-colors hover:bg-slate-800"
+              className="mt-2.5 w-full py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-xs transition-colors hover:bg-slate-800 cursor-pointer"
             >
               Close Fullscreen
             </button>
@@ -119,29 +119,29 @@ export default function ReturnQRModal({ transaction, onClose }: ReturnQRModalPro
         </div>
       ) : (
         /* Regular Modal Presentation */
-        <div className="relative w-full max-w-md bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="relative w-full max-w-md max-h-[92dvh] flex flex-col bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
           {/* Header */}
-          <div className="p-5 sm:p-6 pb-4 border-b border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
-                <QrCode className="w-5 h-5" />
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs shrink-0">
+                <QrCode className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <h3 className="font-extrabold text-slate-900 text-base leading-tight">Return Hardware QR</h3>
-                <p className="text-xs text-slate-500 font-medium">Present to Lab Admin for return verification</p>
+              <div className="min-w-0">
+                <h3 className="font-extrabold text-slate-900 text-sm sm:text-base leading-tight truncate">Return Hardware QR</h3>
+                <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">Present to Lab Admin for return verification</p>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={() => setIsFullscreen(true)}
-                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 title="Fullscreen for easier scanning"
               >
                 <Maximize2 className="w-4 h-4" />
               </button>
               <button
                 onClick={onClose}
-                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 title="Close"
               >
                 <X className="w-4 h-4" />
@@ -149,30 +149,31 @@ export default function ReturnQRModal({ transaction, onClose }: ReturnQRModalPro
             </div>
           </div>
 
-          {/* QR Code Presentation Area */}
-          <div className="p-6 flex flex-col items-center bg-slate-50/50">
-            <div className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-md relative group">
-              {loading || !qrUrl ? (
-                <div className="w-60 h-60 flex items-center justify-center">
-                  <div className="w-8 h-8 border-3 border-slate-900 border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : (
-                <img
-                  src={qrUrl}
-                  alt={`Return QR for ${transaction.componentName}`}
-                  className="w-60 h-60 object-contain block select-none"
-                />
-              )}
-            </div>
+          <div className="overflow-y-auto flex-1">
+            {/* QR Code Presentation Area */}
+            <div className="p-4 sm:p-6 flex flex-col items-center bg-slate-50/50">
+              <div className="p-3 bg-white rounded-2xl border border-slate-200/80 shadow-md relative group">
+                {loading || !qrUrl ? (
+                  <div className="w-48 h-48 sm:w-60 sm:h-60 flex items-center justify-center">
+                    <div className="w-8 h-8 border-3 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <img
+                    src={qrUrl}
+                    alt={`Return QR for ${transaction.componentName}`}
+                    className="w-48 h-48 sm:w-60 sm:h-60 object-contain block select-none"
+                  />
+                )}
+              </div>
 
-            <button
-              onClick={() => setIsFullscreen(true)}
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-              Tap for Fullscreen Bright Mode
-            </button>
-          </div>
+              <button
+                onClick={() => setIsFullscreen(true)}
+                className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+                Tap for Fullscreen Bright Mode
+              </button>
+            </div>
 
           {/* Loan Metadata Beneath QR */}
           <div className="p-5 sm:p-6 pt-4 space-y-3.5 text-xs">
@@ -226,6 +227,7 @@ export default function ReturnQRModal({ transaction, onClose }: ReturnQRModalPro
                 <span>This loan has already been fully returned.</span>
               </div>
             )}
+          </div>
           </div>
 
           {/* Footer Action */}

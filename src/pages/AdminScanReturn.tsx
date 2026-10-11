@@ -82,7 +82,11 @@ export default function AdminScanReturn() {
         { facingMode: 'environment' }, // Prefer rear camera on mobile
         {
           fps: 12,
-          qrbox: { width: 260, height: 260 },
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const qrEdge = Math.max(160, Math.floor(minEdge * 0.72));
+            return { width: qrEdge, height: qrEdge };
+          },
           aspectRatio: 1.0
         },
         async (decodedText) => {
@@ -201,7 +205,7 @@ export default function AdminScanReturn() {
       {/* Main Scanner Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left / Center: Camera Viewport */}
-        <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -216,15 +220,15 @@ export default function AdminScanReturn() {
             </div>
 
             {/* Viewport Box */}
-            <div className="relative w-full aspect-square max-w-[340px] mx-auto bg-slate-900 rounded-2xl overflow-hidden border-2 border-slate-800 shadow-inner flex flex-col items-center justify-center text-white">
+            <div className="relative w-full aspect-square max-w-[280px] sm:max-w-[340px] mx-auto bg-slate-900 rounded-2xl overflow-hidden border-2 border-slate-800 shadow-inner flex flex-col items-center justify-center text-white">
               {/* html5-qrcode mounts here */}
               <div id="qr-reader-viewport" className="w-full h-full" />
 
               {/* Placeholder when camera is inactive */}
               {!isScanning && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-900/95 z-10">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-400 mb-3 border border-slate-700">
-                    <Camera className="w-8 h-8" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-5 text-center bg-slate-900/95 z-10">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-400 mb-3 border border-slate-700">
+                    <Camera className="w-7 h-7 sm:w-8 sm:h-8" />
                   </div>
                   <h3 className="font-bold text-white text-sm mb-1">Camera Standby</h3>
                   <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
@@ -236,7 +240,7 @@ export default function AdminScanReturn() {
               {/* Overlay targeting frame when active */}
               {isScanning && (
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-20">
-                  <div className="w-56 h-56 border-2 border-emerald-400/80 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.35)] relative animate-pulse">
+                  <div className="w-44 h-44 sm:w-56 sm:h-56 border-2 border-emerald-400/80 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.35)] relative animate-pulse">
                     <div className="absolute top-0 left-0 w-4 h-4 border-t-3 border-l-3 border-emerald-400 rounded-tl-sm"></div>
                     <div className="absolute top-0 right-0 w-4 h-4 border-t-3 border-r-3 border-emerald-400 rounded-tr-sm"></div>
                     <div className="absolute bottom-0 left-0 w-4 h-4 border-b-3 border-l-3 border-emerald-400 rounded-bl-sm"></div>
@@ -291,7 +295,7 @@ export default function AdminScanReturn() {
         {/* Right: Manual Lookup & Status Feedback */}
         <div className="lg:col-span-5 space-y-6">
           {/* Manual Input Fallback */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-xs">
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs">
             <div className="flex items-center gap-2 mb-2">
               <Search className="w-4 h-4 text-slate-600" />
               <h2 className="text-sm font-bold text-slate-900">Manual Loan ID Lookup</h2>
@@ -389,7 +393,7 @@ export default function AdminScanReturn() {
           )}
 
           {/* Instructions Box */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs text-xs space-y-2.5 text-slate-600">
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-5 shadow-xs text-xs space-y-2.5 text-slate-600">
             <h3 className="font-bold text-slate-900 flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               Scan Protocol
