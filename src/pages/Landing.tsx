@@ -3,30 +3,6 @@ import { Download } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
-function FingerprintIcon({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <svg 
-      className={className} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
-      <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
-      <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
-      <path d="M2 12a10 10 0 0 1 18-6" />
-      <path d="M2 16h.01" />
-      <path d="M21.8 16c.2-2 .131-5.354 0-6" />
-      <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
-      <path d="M8.65 22c.21-.66.45-1.32.57-2" />
-      <path d="M9 6.8a6 6 0 0 1 9 5.2v2" />
-    </svg>
-  );
-}
-
 export default function Landing() {
   const { user, profile, loading } = useAuth();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -92,20 +68,18 @@ export default function Landing() {
           <div className="flex flex-col items-center justify-center gap-3.5 sm:gap-4 w-full">
             <Link 
               to="/register" 
-              className="group relative w-full max-w-[280px] sm:max-w-[320px] py-3.5 px-6 sm:px-8 rounded-full bg-white/50 hover:bg-white/75 active:bg-white/90 backdrop-blur-xl border border-slate-300/70 ring-1 ring-white/70 shadow-[0_4px_20px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.07),inset_0_1px_2px_rgba(255,255,255,0.95)] flex items-center justify-center gap-3 transition-all duration-200 cursor-pointer active:scale-[0.98]"
+              className="group relative w-full max-w-[280px] sm:max-w-[320px] py-3.5 px-6 sm:px-8 rounded-full bg-white/50 hover:bg-white/75 active:bg-white/90 backdrop-blur-xl border border-slate-300/70 ring-1 ring-white/70 shadow-[0_4px_20px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.07),inset_0_1px_2px_rgba(255,255,255,0.95)] flex items-center justify-center transition-all duration-200 cursor-pointer active:scale-[0.98]"
             >
-              <FingerprintIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500 group-hover:text-slate-700 transition-colors shrink-0" />
-              <span className="text-base sm:text-lg font-medium text-slate-700 group-hover:text-slate-900 tracking-tight transition-colors">
+              <span className="text-base sm:text-lg font-medium text-slate-700 group-hover:text-slate-900 tracking-tight transition-colors text-center">
                 Student Registration
               </span>
             </Link>
 
             <Link 
               to="/login" 
-              className="group relative w-full max-w-[280px] sm:max-w-[320px] py-3.5 px-6 sm:px-8 rounded-full bg-white/50 hover:bg-white/75 active:bg-white/90 backdrop-blur-xl border border-slate-300/70 ring-1 ring-white/70 shadow-[0_4px_20px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.07),inset_0_1px_2px_rgba(255,255,255,0.95)] flex items-center justify-center gap-3 transition-all duration-200 cursor-pointer active:scale-[0.98]"
+              className="group relative w-full max-w-[280px] sm:max-w-[320px] py-3.5 px-6 sm:px-8 rounded-full bg-white/50 hover:bg-white/75 active:bg-white/90 backdrop-blur-xl border border-slate-300/70 ring-1 ring-white/70 shadow-[0_4px_20px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.07),inset_0_1px_2px_rgba(255,255,255,0.95)] flex items-center justify-center transition-all duration-200 cursor-pointer active:scale-[0.98]"
             >
-              <FingerprintIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500 group-hover:text-slate-700 transition-colors shrink-0" />
-              <span className="text-base sm:text-lg font-medium text-slate-700 group-hover:text-slate-900 tracking-tight transition-colors">
+              <span className="text-base sm:text-lg font-medium text-slate-700 group-hover:text-slate-900 tracking-tight transition-colors text-center">
                 Admin Login
               </span>
             </Link>
