@@ -25,8 +25,7 @@ export default function Layout() {
         <div className="flex items-center gap-2.5 px-2 py-3 mb-6">
           <img src="/logo.png" alt="Vinner Lab Logo" className="w-8 h-8 rounded-xl shadow-xs border border-slate-200/80 object-cover" />
           <div className="flex flex-col">
-            <span className="text-base font-bold text-slate-900 tracking-tight leading-none">Vinner Lab</span>
-            <span className="text-[10px] text-slate-400 font-medium tracking-wide uppercase mt-1">Telemetry Portal</span>
+            <span className="text-base font-bold text-slate-900 tracking-tight">Vinner Lab</span>
           </div>
         </div>
         
