@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -7,13 +7,27 @@ import type { UserProfile } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
 export default function Login() {
-  const [loginType, setLoginType] = useState<'student' | 'admin'>('student');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialType = searchParams.get('type') === 'admin' ? 'admin' : 'student';
+  const [loginType, setLoginType] = useState<'student' | 'admin'>(initialType);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const type = searchParams.get('type');
+    if (type === 'admin' || type === 'student') {
+      setLoginType(type);
+    }
+  }, [searchParams]);
+
+  const handleTypeChange = (type: 'student' | 'admin') => {
+    setLoginType(type);
+    setSearchParams({ type });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,23 +82,27 @@ export default function Login() {
         <div className="flex p-1 bg-slate-100/80 rounded-lg mb-8">
           <button 
             type="button"
-            onClick={() => setLoginType('student')}
-            className={cn("flex-1 py-2 text-sm font-medium rounded-md transition-all", loginType === 'student' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+            onClick={() => handleTypeChange('student')}
+            className={cn("flex-1 py-2 text-sm font-medium rounded-md transition-all", loginType === 'student' ? "bg-white text-slate-900 shadow-sm font-semibold" : "text-slate-500 hover:text-slate-700")}
           >
             Student login
           </button>
           <button 
             type="button"
-            onClick={() => setLoginType('admin')}
-            className={cn("flex-1 py-2 text-sm font-medium rounded-md transition-all", loginType === 'admin' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+            onClick={() => handleTypeChange('admin')}
+            className={cn("flex-1 py-2 text-sm font-medium rounded-md transition-all", loginType === 'admin' ? "bg-white text-slate-900 shadow-sm font-semibold" : "text-slate-500 hover:text-slate-700")}
           >
             Admin login
           </button>
         </div>
 
         <div className="mb-8">
-          <p className="text-slate-500 text-sm mb-1">Please enter your details</p>
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Welcome back</h2>
+          <p className="text-slate-500 text-sm mb-1">
+            {loginType === 'admin' ? 'Administrative authorization' : 'Please enter your details'}
+          </p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            {loginType === 'admin' ? 'Admin Portal' : 'Welcome back'}
+          </h2>
         </div>
 
         {error && (
@@ -147,12 +165,18 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="text-center text-sm text-slate-500 mt-8">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-blue-600 font-medium hover:underline">
-            Sign up
-          </Link>
-        </p>
+        {loginType === 'student' ? (
+          <p className="text-center text-sm text-slate-500 mt-8">
+            Don't have an account?{' '}
+            <Link to="/register" className="text-blue-600 font-medium hover:underline">
+              Sign up
+            </Link>
+          </p>
+        ) : (
+          <p className="text-center text-xs text-slate-400 mt-8">
+            Lab Administrator authorization only · No registration
+          </p>
+        )}
       </div>
     </div>
   );
