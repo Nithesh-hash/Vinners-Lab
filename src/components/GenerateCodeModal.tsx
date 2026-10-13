@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Plus, 
-  Trash2, 
   CheckCircle2, 
   AlertCircle, 
   AlertTriangle,
@@ -55,10 +54,16 @@ export default function GenerateCodeModal({ isOpen, onClose, onCodeCreated }: Ge
   const [facultyVerified, setFacultyVerified] = useState(false);
   const [facultyError, setFacultyError] = useState('');
 
-  // Students list state (Dynamic, at least 1, add/delete)
-  const [students, setStudents] = useState<StudentFormItem[]>([
-    { id: '1', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false }
-  ]);
+const createInitialStudents = (): StudentFormItem[] => [
+  { id: '1', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false },
+  { id: '2', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false },
+  { id: '3', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false },
+  { id: '4', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false },
+  { id: '5', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false }
+];
+
+  // Students list state (5 fixed slots: 2 compulsory, 3 optional)
+  const [students, setStudents] = useState<StudentFormItem[]>(createInitialStudents());
 
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,6 +94,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onCodeCreated }: Ge
       setStep('select_type');
       setCreatedCodeResult(null);
       setFormError('');
+      setStudents(createInitialStudents());
     }
   }, [isOpen]);
 
@@ -179,25 +185,6 @@ export default function GenerateCodeModal({ isOpen, onClose, onCodeCreated }: Ge
     });
   };
 
-  const addStudentRow = () => {
-    setStudents(prev => [
-      ...prev,
-      {
-        id: Math.random().toString(36).substring(2, 9),
-        name: '',
-        regNumber: '',
-        mobileNumber: '',
-        isVerified: false,
-        verifying: false
-      }
-    ]);
-  };
-
-  const removeStudentRow = (index: number) => {
-    if (students.length <= 1) return;
-    setStudents(prev => prev.filter((_, i) => i !== index));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
@@ -219,16 +206,12 @@ export default function GenerateCodeModal({ isOpen, onClose, onCodeCreated }: Ge
       return;
     }
 
-    // 2. Validate Students
-    if (students.length === 0) {
-      setFormError('At least one student must be added.');
-      return;
-    }
-
-    for (let i = 0; i < students.length; i++) {
+    // 2. Validate Students: Exactly 5 slots (Student #1 and #2 Compulsory; #3, #4, #5 Optional)
+    // Validate Student #1 and Student #2 (Mandatory)
+    for (let i = 0; i < 2; i++) {
       const s = students[i];
       if (!s.name.trim() || !s.regNumber.trim()) {
-        setFormError(`Student #${i + 1} Name and Registration Number are required.`);
+        setFormError(`Student #${i + 1} is compulsory. Please enter both Name and Registration Number.`);
         return;
       }
       if (!s.isVerified) {
@@ -253,8 +236,42 @@ export default function GenerateCodeModal({ isOpen, onClose, onCodeCreated }: Ge
       }
     }
 
-    // Check duplicate student reg numbers
-    const regNumbers = students.map(s => s.regNumber.trim().toUpperCase());
+    // Validate Student #3, #4, #5 (Optional: If partially filled, must provide both Name and Reg No and be verified)
+    for (let i = 2; i < 5; i++) {
+      const s = students[i];
+      const hasAnyInput = s.name.trim() || s.regNumber.trim() || s.mobileNumber.trim();
+      if (hasAnyInput) {
+        if (!s.name.trim() || !s.regNumber.trim()) {
+          setFormError(`Student #${i + 1} is partially filled. Both Name and Registration Number are required if adding this student.`);
+          return;
+        }
+        if (!s.isVerified) {
+          const checkRes = await verifyUserInPortal(s.regNumber.trim());
+          if (checkRes.exists && checkRes.user) {
+            const userMobile = (checkRes.user.mobileNumber || '').replace(/\D/g, '').slice(0, 10);
+            updateStudent(i, {
+              isVerified: true,
+              verifiedUser: checkRes.user,
+              regNumber: checkRes.user.regNumber || s.regNumber.trim().toUpperCase(),
+              name: s.name.trim() ? s.name : checkRes.user.name,
+              mobileNumber: s.mobileNumber.trim() ? s.mobileNumber : userMobile,
+              error: undefined
+            });
+          } else {
+            const warnMsg = `⚠️ Warning: Student with Reg. No. "${s.regNumber.trim().toUpperCase()}" is not registered in the portal. Please register the student first.`;
+            updateStudent(i, { error: warnMsg });
+            setFormError(warnMsg);
+            return;
+          }
+        }
+      }
+    }
+
+    // Filter active students: Students #1 & #2, plus any filled optional students
+    const activeStudents = students.filter(s => s.regNumber.trim() && s.name.trim());
+
+    // Check duplicate student reg numbers among active students
+    const regNumbers = activeStudents.map(s => s.regNumber.trim().toUpperCase());
     const uniqueRegs = new Set(regNumbers);
     if (uniqueRegs.size !== regNumbers.length) {
       setFormError('Duplicate student registration numbers are not allowed.');
@@ -263,11 +280,11 @@ export default function GenerateCodeModal({ isOpen, onClose, onCodeCreated }: Ge
 
     // 3. Condition: Validate student mobile numbers (strictly 10 digits if entered; at least 1 student mobile is mandatory)
     let validStudentMobileCount = 0;
-    for (let i = 0; i < students.length; i++) {
-      const sMobile = students[i].mobileNumber.trim();
+    for (let i = 0; i < activeStudents.length; i++) {
+      const sMobile = activeStudents[i].mobileNumber.trim();
       if (sMobile) {
         if (sMobile.length !== 10 || !/^\d{10}$/.test(sMobile)) {
-          setFormError(`Student #${i + 1} (${students[i].name || students[i].regNumber}) mobile number must be exactly 10 digits.`);
+          setFormError(`Student #${i + 1} (${activeStudents[i].name || activeStudents[i].regNumber}) mobile number must be exactly 10 digits.`);
           return;
         }
         validStudentMobileCount++;
@@ -282,7 +299,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onCodeCreated }: Ge
     setIsSubmitting(true);
 
     try {
-      const studentMembers: ProjectMember[] = students.map(s => {
+      const studentMembers: ProjectMember[] = activeStudents.map(s => {
         const item: ProjectMember = {
           name: s.name.trim(),
           regNumber: s.regNumber.trim().toUpperCase()
@@ -343,6 +360,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onCodeCreated }: Ge
   const handleClose = () => {
     setCreatedCodeResult(null);
     setFormError('');
+    setStudents(createInitialStudents());
     onClose();
   };
 
@@ -619,7 +637,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onCodeCreated }: Ge
               )}
             </div>
 
-            {/* SECTION 2: STUDENTS DETAILS (Dynamic add/delete, verified via Reg. No) */}
+            {/* SECTION 2: STUDENTS DETAILS (5 Students: 2 compulsory, 3 optional) */}
             <div className="border border-slate-200/90 rounded-2xl p-4 sm:p-5 bg-white shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                 <div className="flex items-center gap-2">
@@ -630,121 +648,117 @@ export default function GenerateCodeModal({ isOpen, onClose, onCodeCreated }: Ge
                     <h4 className="text-sm font-extrabold text-slate-900">Student Team Members</h4>
                   </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={addStudentRow}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-900 hover:bg-black text-white text-[11px] font-bold shadow-2xs transition-all cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add Student
-                </button>
               </div>
 
               <div className="space-y-3">
-                {students.map((student, index) => (
-                  <div 
-                    key={student.id} 
-                    className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 space-y-2.5 hover:border-slate-300 transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                        Student #{index + 1}
-                        {student.isVerified && (
-                          <span className="text-emerald-600 font-normal inline-flex items-center gap-0.5 text-[10px]">
-                            <CheckCircle2 className="w-3 h-3" /> Verified
-                          </span>
-                        )}
-                      </span>
+                {students.map((student, index) => {
+                  const isCompulsory = index < 2; // Students #1 and #2 compulsory, #3, #4, #5 optional
+                  return (
+                    <div 
+                      key={student.id} 
+                      className={`p-3.5 rounded-xl border transition-all space-y-2.5 ${
+                        isCompulsory 
+                          ? 'border-slate-200/90 bg-slate-50/60 hover:border-slate-300' 
+                          : 'border-slate-200/70 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          Student #{index + 1}
+                          {isCompulsory ? (
+                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full">
+                              Compulsory
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                              Optional
+                            </span>
+                          )}
+                          {student.isVerified && (
+                            <span className="text-emerald-600 font-normal inline-flex items-center gap-0.5 text-[10px]">
+                              <CheckCircle2 className="w-3 h-3" /> Verified
+                            </span>
+                          )}
+                        </span>
+                      </div>
 
-                      {students.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeStudentRow(index)}
-                          className="text-slate-400 hover:text-red-600 p-1 rounded-md transition-colors cursor-pointer"
-                          title="Remove student"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        {/* Registration Number with verification */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Reg. Number {isCompulsory && '*'}
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              required={isCompulsory}
+                              placeholder={isCompulsory ? "e.g. 21BCE1042" : "e.g. 21BCE1045 (Optional)"}
+                              value={student.regNumber}
+                              onChange={e => {
+                                const val = e.target.value.toUpperCase();
+                                updateStudent(index, { regNumber: val, isVerified: false, error: undefined });
+                              }}
+                              onBlur={() => {
+                                if (student.regNumber.trim() && !student.isVerified) {
+                                  handleVerifyStudent(index, student.regNumber);
+                                }
+                              }}
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-mono text-slate-900 uppercase focus:outline-none focus:ring-1 focus:ring-black pr-14"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleVerifyStudent(index)}
+                              disabled={student.verifying || !student.regNumber.trim()}
+                              className="absolute right-1 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-[10px] font-bold text-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
+                            >
+                              {student.verifying ? '...' : 'Verify'}
+                            </button>
+                          </div>
+                        </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      {/* Registration Number with verification */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Reg. Number *
-                        </label>
-                        <div className="relative">
+                        {/* Student Name */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Student Name {isCompulsory && '*'}
+                          </label>
                           <input
                             type="text"
-                            required
-                            placeholder="21BCE1042"
-                            value={student.regNumber}
-                            onChange={e => {
-                              const val = e.target.value.toUpperCase();
-                              updateStudent(index, { regNumber: val, isVerified: false, error: undefined });
-                            }}
-                            onBlur={() => {
-                              if (student.regNumber.trim() && !student.isVerified) {
-                                handleVerifyStudent(index, student.regNumber);
-                              }
-                            }}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-mono text-slate-900 uppercase focus:outline-none focus:ring-1 focus:ring-black pr-14"
+                            required={isCompulsory}
+                            placeholder={isCompulsory ? "Alex Johnson" : "Name (Optional)"}
+                            value={student.name}
+                            onChange={e => updateStudent(index, { name: e.target.value })}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-black"
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleVerifyStudent(index)}
-                            disabled={student.verifying || !student.regNumber.trim()}
-                            className="absolute right-1 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-[10px] font-bold text-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
-                          >
-                            {student.verifying ? '...' : 'Verify'}
-                          </button>
+                        </div>
+
+                        {/* Mobile Number */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Mobile Number (10 Digits)
+                          </label>
+                          <input
+                            type="tel"
+                            maxLength={10}
+                            placeholder="10-digit mobile (optional)"
+                            value={student.mobileNumber}
+                            onChange={e => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                              updateStudent(index, { mobileNumber: val });
+                            }}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-black"
+                          />
                         </div>
                       </div>
 
-                      {/* Student Name */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Student Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Alex Johnson"
-                          value={student.name}
-                          onChange={e => updateStudent(index, { name: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-black"
-                        />
-                      </div>
-
-                      {/* Mobile Number (any 1 is enough) */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Mobile Number (10 Digits, Any 1 required)
-                        </label>
-                        <input
-                          type="tel"
-                          maxLength={10}
-                          placeholder="10-digit mobile (optional)"
-                          value={student.mobileNumber}
-                          onChange={e => {
-                            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                            updateStudent(index, { mobileNumber: val });
-                          }}
-                          className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-black"
-                        />
-                      </div>
+                      {student.error && (
+                        <div className="bg-amber-50 border border-amber-200 text-amber-900 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs animate-in fade-in duration-200">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>{student.error}</span>
+                        </div>
+                      )}
                     </div>
-
-                    {student.error && (
-                      <div className="bg-amber-50 border border-amber-200 text-amber-900 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs animate-in fade-in duration-200">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>{student.error}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
