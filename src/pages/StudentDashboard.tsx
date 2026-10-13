@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -26,7 +26,7 @@ export default function StudentDashboard() {
   const activeTab = searchParams.get('tab') || 'overview';
   
   const { profile, user } = useAuth();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [dbTransactions, setDbTransactions] = useState<Transaction[]>([]);
   const [projectCodes, setProjectCodes] = useState<ProjectCode[]>([]);
   const [inventory, setInventory] = useState<Component[]>([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
@@ -41,12 +41,79 @@ export default function StudentDashboard() {
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
 
   const isFaculty = profile?.role === 'faculty';
-  const userReg = profile?.regNumber?.toUpperCase();
+  const userReg = (profile?.regNumber || (profile as any)?.employeeId || '').trim().toUpperCase();
+
+  // Consolidated & synthesized transactions from both Firestore transaction listeners and projectCodes.issuedItems
+  // This guarantees that any component issued under a team's code immediately reflects across ALL team members and faculty
+  const transactions = useMemo(() => {
+    const txMap = new Map<string, Transaction>();
+
+    // 1. Add all direct transactions from database listeners
+    dbTransactions.forEach(t => {
+      txMap.set(t.id, t);
+    });
+
+    // 2. Synthesize/merge from projectCodes.issuedItems for immediate real-time reflection
+    projectCodes.forEach(pc => {
+      (pc.issuedItems || []).forEach(item => {
+        const existing = txMap.get(item.transactionId);
+        if (!existing) {
+          txMap.set(item.transactionId, {
+            id: item.transactionId,
+            componentId: item.componentId,
+            componentName: item.componentName,
+            studentId: '',
+            studentName: item.collectedByStudentName,
+            studentRegNumber: item.collectedByStudentRegNumber,
+            quantity: item.quantity,
+            returnedQuantity: item.returnedQuantity || 0,
+            expectedReturnDate: item.expectedReturnDate,
+            issueDate: item.issueDate,
+            status: item.status,
+            issuedByAdminId: pc.createdByAdminId || 'admin',
+            issuedByAdminName: pc.createdByName || 'Administrator',
+            projectCode: pc.code,
+            facultyEmployeeId: pc.facultyEmployeeId || pc.faculty?.employeeId,
+            facultyName: pc.faculty?.name,
+            facultyMobile: pc.faculty?.mobileNumber,
+            teamStudentRegNumbers: pc.studentRegNumbers || pc.students?.map(s => s.regNumber),
+            teamStudents: pc.students,
+            collectedByStudentName: item.collectedByStudentName,
+            collectedByStudentRegNumber: item.collectedByStudentRegNumber
+          });
+        } else {
+          // Augment team / project code context if not present
+          if (!existing.projectCode) existing.projectCode = pc.code;
+          if (!existing.collectedByStudentName) existing.collectedByStudentName = item.collectedByStudentName;
+          if (!existing.collectedByStudentRegNumber) existing.collectedByStudentRegNumber = item.collectedByStudentRegNumber;
+          if (!existing.facultyName) existing.facultyName = pc.faculty?.name;
+          if (!existing.teamStudents) existing.teamStudents = pc.students;
+        }
+      });
+    });
+
+    const list = Array.from(txMap.values());
+    list.sort((a, b) => (b.issueDate?.seconds || 0) - (a.issueDate?.seconds || 0));
+    return list;
+  }, [dbTransactions, projectCodes]);
 
   useEffect(() => {
-    if (!user || !userReg) return;
-    
+    if (!user) return;
     setLoading(true);
+
+    // Dynamic unsubscriptions for per-code transaction listeners
+    let codeTxUnsubs: Array<() => void> = [];
+
+    // Local transaction map for Firestore transaction listeners
+    const txMap = new Map<string, Transaction>();
+
+    const updateTxState = () => {
+      const allTx = Array.from(txMap.values());
+      allTx.sort((a, b) => (b.issueDate?.seconds || 0) - (a.issueDate?.seconds || 0));
+      setDbTransactions(allTx);
+      setLoading(false);
+      checkAndAutoSendDueDateNotifications();
+    };
 
     // 1. Fetch Project Codes
     let codeQuery;
@@ -60,53 +127,66 @@ export default function StudentDashboard() {
       const codeList = snap.docs.map(d => ({ id: d.id, ...d.data() } as ProjectCode));
       codeList.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setProjectCodes(codeList);
+      setLoading(false);
+
+      // Clean up previous per-code listeners
+      codeTxUnsubs.forEach(u => u());
+      codeTxUnsubs = [];
+
+      // Set up real-time listener for every project code's transactions
+      codeList.forEach(pc => {
+        if (!pc.code) return;
+        const qCodeTx = query(collection(db, 'transactions'), where('projectCode', '==', pc.code));
+        const u = onSnapshot(qCodeTx, (txSnap) => {
+          txSnap.docs.forEach(d => {
+            txMap.set(d.id, { id: d.id, ...d.data() } as Transaction);
+          });
+          updateTxState();
+        }, (err) => {
+          console.warn(`Transactions listener note for code ${pc.code}:`, err);
+        });
+        codeTxUnsubs.push(u);
+      });
     }, (err) => {
       console.warn("Error fetching project codes:", err);
-    });
-
-    // 2. Fetch Transactions (Personal & Team)
-    // We map transactions by ID to eliminate any overlap
-    const txMap = new Map<string, Transaction>();
-
-    const updateTxState = () => {
-      const allTx = Array.from(txMap.values());
-      allTx.sort((a, b) => (b.issueDate?.seconds || 0) - (a.issueDate?.seconds || 0));
-      setTransactions(allTx);
+      setErrorMsg(err.message);
       setLoading(false);
-      checkAndAutoSendDueDateNotifications();
-    };
+    });
 
     let unsubPersonalTx = () => {};
     let unsubTeamTx = () => {};
     let unsubFacultyTx = () => {};
 
     if (isFaculty) {
-      const qFaculty = query(collection(db, 'transactions'), where('facultyEmployeeId', '==', userReg));
-      unsubFacultyTx = onSnapshot(qFaculty, (snap) => {
-        snap.docs.forEach(d => txMap.set(d.id, { id: d.id, ...d.data() } as Transaction));
-        updateTxState();
-      }, (err) => {
-        console.error("Error fetching faculty transactions:", err);
-        setErrorMsg(err.message);
-        setLoading(false);
-      });
+      if (userReg) {
+        const qFaculty = query(collection(db, 'transactions'), where('facultyEmployeeId', '==', userReg));
+        unsubFacultyTx = onSnapshot(qFaculty, (snap) => {
+          snap.docs.forEach(d => txMap.set(d.id, { id: d.id, ...d.data() } as Transaction));
+          updateTxState();
+        }, (err) => {
+          console.warn("Error fetching faculty transactions:", err);
+          updateTxState();
+        });
+      }
     } else {
-      // For student: query personal checkouts
-      const qPersonal = query(collection(db, 'transactions'), where('studentRegNumber', '==', userReg));
-      unsubPersonalTx = onSnapshot(qPersonal, (snap) => {
-        snap.docs.forEach(d => txMap.set(d.id, { id: d.id, ...d.data() } as Transaction));
-        updateTxState();
-      });
+      if (userReg) {
+        // Query personal checkouts
+        const qPersonal = query(collection(db, 'transactions'), where('studentRegNumber', '==', userReg));
+        unsubPersonalTx = onSnapshot(qPersonal, (snap) => {
+          snap.docs.forEach(d => txMap.set(d.id, { id: d.id, ...d.data() } as Transaction));
+          updateTxState();
+        });
 
-      // Also query team checkouts where teamStudentRegNumbers includes this student
-      const qTeam = query(collection(db, 'transactions'), where('teamStudentRegNumbers', 'array-contains', userReg));
-      unsubTeamTx = onSnapshot(qTeam, (snap) => {
-        snap.docs.forEach(d => txMap.set(d.id, { id: d.id, ...d.data() } as Transaction));
-        updateTxState();
-      }, (err) => {
-        console.warn("Team transactions query note:", err);
-        updateTxState();
-      });
+        // Query team checkouts
+        const qTeam = query(collection(db, 'transactions'), where('teamStudentRegNumbers', 'array-contains', userReg));
+        unsubTeamTx = onSnapshot(qTeam, (snap) => {
+          snap.docs.forEach(d => txMap.set(d.id, { id: d.id, ...d.data() } as Transaction));
+          updateTxState();
+        }, (err) => {
+          console.warn("Team transactions query note:", err);
+          updateTxState();
+        });
+      }
     }
 
     // 3. Fetch Lab Inventory
@@ -117,17 +197,21 @@ export default function StudentDashboard() {
     });
 
     // 4. Fetch Unread Notifications Count
-    const notifQuery = query(
-      collection(db, 'notifications'),
-      where('targetRegNumber', '==', userReg),
-      where('isRead', '==', false)
-    );
-    const unsubNotifs = onSnapshot(notifQuery, (snap) => {
-      setUnreadNotifCount(snap.size);
-    });
+    let unsubNotifs = () => {};
+    if (userReg) {
+      const notifQuery = query(
+        collection(db, 'notifications'),
+        where('targetRegNumber', '==', userReg),
+        where('isRead', '==', false)
+      );
+      unsubNotifs = onSnapshot(notifQuery, (snap) => {
+        setUnreadNotifCount(snap.size);
+      });
+    }
 
     return () => {
       unsubCodes();
+      codeTxUnsubs.forEach(u => u());
       unsubPersonalTx();
       unsubTeamTx();
       unsubFacultyTx();
@@ -235,7 +319,9 @@ export default function StudentDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
             {urgentAlerts.map(t => {
               const dueStatus = getDueDateStatus(t.expectedReturnDate);
-              const isCollector = t.studentRegNumber.toUpperCase() === userReg;
+              const isCollector = (t.studentRegNumber || t.collectedByStudentRegNumber || '').trim().toUpperCase() === userReg;
+              const collectorName = t.collectedByStudentName || t.studentName || 'Student';
+              const collectorReg = t.collectedByStudentRegNumber || t.studentRegNumber || '';
               return (
                 <div key={t.id} className="p-3 bg-white rounded-xl border border-rose-200/80 shadow-2xs text-xs flex items-start justify-between gap-3">
                   <div>
@@ -246,7 +332,11 @@ export default function StudentDashboard() {
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      {isCollector ? 'Collected by You' : `Collected by teammate: ${t.studentName} (${t.studentRegNumber})`}
+                      {isFaculty 
+                        ? `Issued to student: ${collectorName} (${collectorReg})` 
+                        : isCollector 
+                        ? 'Collected by You' 
+                        : `Collected by teammate: ${collectorName} (${collectorReg})`}
                     </p>
                     {t.projectCode && (
                       <p className="font-mono text-[10px] font-bold text-slate-700 mt-1">
@@ -470,27 +560,48 @@ export default function StudentDashboard() {
                           const dueStatus = getDueDateStatus(tx.expectedReturnDate);
                           const outstanding = tx.quantity - (tx.returnedQuantity || 0);
                           const isPartiallyReturned = (tx.returnedQuantity || 0) > 0 && outstanding > 0;
-                          const isCollector = tx.studentRegNumber.toUpperCase() === userReg;
+                          const isCollector = (tx.studentRegNumber || tx.collectedByStudentRegNumber || '').trim().toUpperCase() === userReg;
+                          const collectorName = tx.collectedByStudentName || tx.studentName || 'Student';
+                          const collectorReg = tx.collectedByStudentRegNumber || tx.studentRegNumber || '';
 
                           return (
                             <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors">
                               <td className="px-6 py-4">
                                 <p className="font-bold text-slate-900">{tx.componentName}</p>
-                                {tx.projectCode && (
-                                  <span className="font-mono text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                                    {tx.projectCode}
+                                {tx.projectCode ? (
+                                  <span className="font-mono text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-md inline-flex items-center gap-1 mt-1">
+                                    <span>Code:</span>
+                                    <strong>{tx.projectCode}</strong>
+                                  </span>
+                                ) : (
+                                  <span className="font-mono text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-0.5">
+                                    Personal Checkout
                                   </span>
                                 )}
                               </td>
                               <td className="px-6 py-4">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                  isCollector 
-                                    ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                                    : 'bg-slate-100 text-slate-700 border border-slate-200'
-                                }`}>
-                                  {isCollector ? 'You' : tx.studentName}
-                                </span>
-                                <p className="text-[10px] text-slate-400 font-mono mt-0.5">{tx.studentRegNumber}</p>
+                                {isFaculty ? (
+                                  <div>
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                      Student: {collectorName}
+                                    </span>
+                                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">Reg: {collectorReg}</p>
+                                  </div>
+                                ) : isCollector ? (
+                                  <div>
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                      You (In Your Custody)
+                                    </span>
+                                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">{collectorReg || userReg}</p>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                      Teammate: {collectorName}
+                                    </span>
+                                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">Reg: {collectorReg}</p>
+                                  </div>
+                                )}
                               </td>
                               <td className="px-6 py-4 font-extrabold text-slate-900">
                                 {outstanding} of {tx.quantity}
@@ -544,16 +655,22 @@ export default function StudentDashboard() {
                       const dueStatus = getDueDateStatus(tx.expectedReturnDate);
                       const outstanding = tx.quantity - (tx.returnedQuantity || 0);
                       const isPartiallyReturned = (tx.returnedQuantity || 0) > 0 && outstanding > 0;
-                      const isCollector = tx.studentRegNumber.toUpperCase() === userReg;
+                      const isCollector = (tx.studentRegNumber || tx.collectedByStudentRegNumber || '').trim().toUpperCase() === userReg;
+                      const collectorName = tx.collectedByStudentName || tx.studentName || 'Student';
+                      const collectorReg = tx.collectedByStudentRegNumber || tx.studentRegNumber || '';
 
                       return (
                         <div key={tx.id} className="p-3.5 sm:p-4 space-y-3">
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">{tx.componentName}</h3>
-                              {tx.projectCode && (
-                                <span className="font-mono text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                              {tx.projectCode ? (
+                                <span className="font-mono text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded mt-1 inline-block">
                                   Code: {tx.projectCode}
+                                </span>
+                              ) : (
+                                <span className="font-mono text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded mt-1 inline-block">
+                                  Personal Loan
                                 </span>
                               )}
                             </div>
@@ -569,8 +686,10 @@ export default function StudentDashboard() {
                           <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
                             <div>
                               <span className="text-[10px] text-slate-400 uppercase font-semibold">Held By</span>
-                              <p className="font-bold text-slate-900">{isCollector ? 'You' : tx.studentName}</p>
-                              <p className="text-[10px] font-mono text-slate-500">{tx.studentRegNumber}</p>
+                              <p className="font-bold text-slate-900">
+                                {isFaculty ? `Student: ${collectorName}` : isCollector ? 'You (In Your Custody)' : `Teammate: ${collectorName}`}
+                              </p>
+                              <p className="text-[10px] font-mono text-slate-500">Reg: {collectorReg}</p>
                             </div>
                             <div>
                               <span className="text-[10px] text-slate-400 uppercase font-semibold">Expected Return</span>

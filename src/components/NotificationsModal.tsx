@@ -31,7 +31,7 @@ export default function NotificationsModal({ isOpen, onClose }: NotificationsMod
     if (!isOpen || !user) return;
     setLoading(true);
 
-    const userReg = profile?.regNumber?.toUpperCase();
+    const userReg = (profile?.regNumber || (profile as any)?.employeeId || '').trim().toUpperCase();
 
     // Query notifications directed to this user
     let notifQuery;
@@ -60,26 +60,46 @@ export default function NotificationsModal({ isOpen, onClose }: NotificationsMod
     });
 
     // Also fetch active transactions to compute real-time nearing due dates
-    let txQuery;
-    if (profile?.role === 'admin') {
-      txQuery = query(collection(db, 'transactions'), where('status', '!=', 'Returned'));
-    } else if (profile?.role === 'faculty' && userReg) {
-      txQuery = query(collection(db, 'transactions'), where('facultyEmployeeId', '==', userReg));
-    } else if (userReg) {
-      txQuery = query(collection(db, 'transactions'), where('studentRegNumber', '==', userReg));
-    }
+    const loansMap = new Map<string, Transaction>();
+    const updateLoansState = () => {
+      setActiveLoans(Array.from(loansMap.values()));
+    };
 
-    let unsubTx = () => {};
-    if (txQuery) {
-      unsubTx = onSnapshot(txQuery, (snap) => {
-        const txs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Transaction));
-        setActiveLoans(txs);
+    let unsubTx1 = () => {};
+    let unsubTx2 = () => {};
+
+    if (profile?.role === 'admin') {
+      const q = query(collection(db, 'transactions'), where('status', '!=', 'Returned'));
+      unsubTx1 = onSnapshot(q, (snap) => {
+        snap.docs.forEach(d => loansMap.set(d.id, { id: d.id, ...d.data() } as Transaction));
+        updateLoansState();
+      });
+    } else if (profile?.role === 'faculty' && userReg) {
+      const q = query(collection(db, 'transactions'), where('facultyEmployeeId', '==', userReg));
+      unsubTx1 = onSnapshot(q, (snap) => {
+        snap.docs.forEach(d => loansMap.set(d.id, { id: d.id, ...d.data() } as Transaction));
+        updateLoansState();
+      });
+    } else if (userReg) {
+      const qPersonal = query(collection(db, 'transactions'), where('studentRegNumber', '==', userReg));
+      unsubTx1 = onSnapshot(qPersonal, (snap) => {
+        snap.docs.forEach(d => loansMap.set(d.id, { id: d.id, ...d.data() } as Transaction));
+        updateLoansState();
+      });
+
+      const qTeam = query(collection(db, 'transactions'), where('teamStudentRegNumbers', 'array-contains', userReg));
+      unsubTx2 = onSnapshot(qTeam, (snap) => {
+        snap.docs.forEach(d => loansMap.set(d.id, { id: d.id, ...d.data() } as Transaction));
+        updateLoansState();
+      }, (e) => {
+        console.warn("Notifications team tx query notice:", e);
       });
     }
 
     return () => {
       unsubNotifs();
-      unsubTx();
+      unsubTx1();
+      unsubTx2();
     };
   }, [isOpen, user, profile]);
 

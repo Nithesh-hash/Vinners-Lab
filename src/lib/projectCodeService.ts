@@ -168,15 +168,16 @@ export async function createProjectCodeRecord(params: {
   const batch = writeBatch(db);
 
   const codeRef = doc(db, 'project_codes', code);
-  const studentRegNumbers = students.map(s => s.regNumber.toUpperCase());
-  const facultyEmployeeId = faculty.employeeId.toUpperCase();
+  const studentRegNumbers = Array.from(new Set(students.map(s => (s.regNumber || '').trim().toUpperCase()).filter(Boolean)));
+  const facultyEmployeeId = (faculty.employeeId || '').trim().toUpperCase();
+  const facultyEmail = (faculty.email || '').trim().toLowerCase();
 
   const sanitizedFaculty: ProjectFaculty = {
     name: faculty.name.trim(),
     employeeId: facultyEmployeeId,
     mobileNumber: faculty.mobileNumber.trim()
   };
-  if (faculty.email) sanitizedFaculty.email = faculty.email.trim();
+  if (facultyEmail) sanitizedFaculty.email = facultyEmail;
   if (faculty.uid) sanitizedFaculty.uid = faculty.uid.trim();
 
   const sanitizedStudents: ProjectMember[] = students.map(s => {
@@ -333,6 +334,12 @@ export async function issueComponentUnderProjectCode(params: {
   const batch = writeBatch(db);
   const txRef = doc(collection(db, 'transactions'));
   const dueTimestamp = Timestamp.fromDate(dueDate);
+  const cleanCollectorReg = selectedStudent.regNumber.trim().toUpperCase();
+  const facultyEmployeeId = (projectCode.facultyEmployeeId || projectCode.faculty?.employeeId || '').trim().toUpperCase();
+  const allTeamRegNumbers = Array.from(new Set([
+    ...(projectCode.studentRegNumbers || []),
+    ...(projectCode.students || []).map(s => s.regNumber)
+  ].map(r => (r || '').trim().toUpperCase()).filter(Boolean)));
 
   // 1. Create Transaction
   const transactionData = {
@@ -340,9 +347,9 @@ export async function issueComponentUnderProjectCode(params: {
     componentId: component.id,
     componentName: component.name,
     studentId: selectedStudent.uid || '',
-    studentName: selectedStudent.name,
-    studentRegNumber: selectedStudent.regNumber.toUpperCase(),
-    studentEmail: selectedStudent.email || '',
+    studentName: selectedStudent.name.trim(),
+    studentRegNumber: cleanCollectorReg,
+    studentEmail: (selectedStudent.email || '').trim().toLowerCase(),
     quantity,
     returnedQuantity: 0,
     expectedReturnDate: dueTimestamp,
@@ -352,14 +359,14 @@ export async function issueComponentUnderProjectCode(params: {
     issuedByAdminName: adminName,
     adminNotes: notes || '',
     // Project Code Linkage
-    projectCode: projectCode.code,
-    facultyEmployeeId: projectCode.faculty.employeeId.toUpperCase(),
-    facultyName: projectCode.faculty.name,
-    facultyMobile: projectCode.faculty.mobileNumber,
-    teamStudentRegNumbers: projectCode.studentRegNumbers,
-    teamStudents: projectCode.students,
-    collectedByStudentName: selectedStudent.name,
-    collectedByStudentRegNumber: selectedStudent.regNumber.toUpperCase()
+    projectCode: projectCode.code.trim().toUpperCase(),
+    facultyEmployeeId,
+    facultyName: projectCode.faculty?.name || '',
+    facultyMobile: projectCode.faculty?.mobileNumber || '',
+    teamStudentRegNumbers: allTeamRegNumbers,
+    teamStudents: projectCode.students || [],
+    collectedByStudentName: selectedStudent.name.trim(),
+    collectedByStudentRegNumber: cleanCollectorReg
   };
   batch.set(txRef, cleanForFirestore(transactionData));
 
@@ -373,22 +380,25 @@ export async function issueComponentUnderProjectCode(params: {
 
   // 3. Update Project Code record with issued item
   const codeRef = doc(db, 'project_codes', projectCode.code);
-  const newIssuedItem = {
+  const newIssuedItem: ProjectIssuedItem = {
     transactionId: txRef.id,
     componentId: component.id,
     componentName: component.name,
     quantity,
     returnedQuantity: 0,
-    collectedByStudentName: selectedStudent.name,
-    collectedByStudentRegNumber: selectedStudent.regNumber.toUpperCase(),
+    collectedByStudentName: selectedStudent.name.trim(),
+    collectedByStudentRegNumber: cleanCollectorReg,
     issueDate: Timestamp.now(),
     expectedReturnDate: dueTimestamp,
-    status: 'Checked Out' as const
+    status: 'Checked Out'
   };
 
   const updatedIssuedItems = [...(projectCode.issuedItems || []), newIssuedItem];
   batch.update(codeRef, cleanForFirestore({
-    issuedItems: updatedIssuedItems
+    issuedItems: updatedIssuedItems,
+    studentRegNumbers: allTeamRegNumbers,
+    facultyEmployeeId,
+    updatedAt: Timestamp.now()
   }));
 
   // 4. Send Notifications to ALL students and faculty in the team
@@ -397,13 +407,14 @@ export async function issueComponentUnderProjectCode(params: {
   // Notifications for all team students
   projectCode.students.forEach(student => {
     const notifRef = doc(collection(db, 'notifications'));
-    const isCollector = student.regNumber.toUpperCase() === selectedStudent.regNumber.toUpperCase();
+    const sReg = (student.regNumber || '').trim().toUpperCase();
+    const isCollector = sReg === cleanCollectorReg;
     const notif: NotificationItem = {
       id: notifRef.id,
-      targetRegNumber: student.regNumber.toUpperCase(),
+      targetRegNumber: sReg,
       roleTarget: 'student',
       title: `Hardware Issued: ${component.name}`,
-      message: `${quantity}x ${component.name} issued to ${isCollector ? 'you' : selectedStudent.name} (${selectedStudent.regNumber}) under Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
+      message: `${quantity}x ${component.name} issued to ${isCollector ? 'you' : selectedStudent.name} (${cleanCollectorReg}) under Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
       type: 'component_issued',
       projectCode: projectCode.code,
       componentName: component.name,
@@ -422,10 +433,10 @@ export async function issueComponentUnderProjectCode(params: {
   const facultyNotifRef = doc(collection(db, 'notifications'));
   const facultyNotif: NotificationItem = {
     id: facultyNotifRef.id,
-    targetRegNumber: projectCode.faculty.employeeId.toUpperCase(),
+    targetRegNumber: facultyEmployeeId,
     roleTarget: 'faculty',
     title: `Component Issued for Code ${projectCode.code}`,
-    message: `${quantity}x ${component.name} issued to student ${selectedStudent.name} under Project Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
+    message: `${quantity}x ${component.name} issued to student ${selectedStudent.name} (${cleanCollectorReg}) under Project Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
     type: 'component_issued',
     projectCode: projectCode.code,
     componentName: component.name,
@@ -434,7 +445,7 @@ export async function issueComponentUnderProjectCode(params: {
     createdAt: Timestamp.now(),
     urgency: 'info'
   };
-  if (projectCode.faculty.uid) {
+  if (projectCode.faculty?.uid) {
     facultyNotif.userId = projectCode.faculty.uid;
   }
   batch.set(facultyNotifRef, cleanForFirestore(facultyNotif));
@@ -483,6 +494,14 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
   const txIds: string[] = [];
   const newIssuedItems: ProjectIssuedItem[] = [];
 
+  const cleanCollectorReg = selectedStudent.regNumber.trim().toUpperCase();
+  const facultyEmployeeId = (projectCode.facultyEmployeeId || projectCode.faculty?.employeeId || '').trim().toUpperCase();
+  const facultyEmail = (projectCode.faculty?.email || '').trim().toLowerCase();
+  const allTeamRegNumbers = Array.from(new Set([
+    ...(projectCode.studentRegNumbers || []),
+    ...(projectCode.students || []).map(s => s.regNumber)
+  ].map(r => (r || '').trim().toUpperCase()).filter(Boolean)));
+
   // 2. Create transactions for each component
   for (const item of items) {
     const txRef = doc(collection(db, 'transactions'));
@@ -493,9 +512,9 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
       componentId: item.component.id,
       componentName: item.component.name,
       studentId: selectedStudent.uid || '',
-      studentName: selectedStudent.name,
-      studentRegNumber: selectedStudent.regNumber.toUpperCase(),
-      studentEmail: selectedStudent.email || '',
+      studentName: selectedStudent.name.trim(),
+      studentRegNumber: cleanCollectorReg,
+      studentEmail: (selectedStudent.email || '').trim().toLowerCase(),
       quantity: item.quantity,
       returnedQuantity: 0,
       expectedReturnDate: dueTimestamp,
@@ -505,14 +524,15 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
       issuedByAdminName: adminName,
       adminNotes: notes || '',
       // Project Code Linkage
-      projectCode: projectCode.code,
-      facultyEmployeeId: projectCode.faculty.employeeId.toUpperCase(),
-      facultyName: projectCode.faculty.name,
-      facultyMobile: projectCode.faculty.mobileNumber,
-      teamStudentRegNumbers: projectCode.studentRegNumbers,
-      teamStudents: projectCode.students,
-      collectedByStudentName: selectedStudent.name,
-      collectedByStudentRegNumber: selectedStudent.regNumber.toUpperCase()
+      projectCode: projectCode.code.trim().toUpperCase(),
+      facultyEmployeeId,
+      facultyEmail,
+      facultyName: projectCode.faculty?.name || '',
+      facultyMobile: projectCode.faculty?.mobileNumber || '',
+      teamStudentRegNumbers: allTeamRegNumbers,
+      teamStudents: projectCode.students || [],
+      collectedByStudentName: selectedStudent.name.trim(),
+      collectedByStudentRegNumber: cleanCollectorReg
     };
     batch.set(txRef, cleanForFirestore(transactionData));
 
@@ -522,11 +542,11 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
       componentName: item.component.name,
       quantity: item.quantity,
       returnedQuantity: 0,
-      collectedByStudentName: selectedStudent.name,
-      collectedByStudentRegNumber: selectedStudent.regNumber.toUpperCase(),
+      collectedByStudentName: selectedStudent.name.trim(),
+      collectedByStudentRegNumber: cleanCollectorReg,
       issueDate: Timestamp.now(),
       expectedReturnDate: dueTimestamp,
-      status: 'Checked Out' as const
+      status: 'Checked Out'
     });
   }
 
@@ -545,11 +565,14 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
     }
   }
 
-  // 4. Update Project Code with all new issued items
+  // 4. Update Project Code with all new issued items and synced team arrays
   const codeRef = doc(db, 'project_codes', projectCode.code);
   const updatedIssuedItems = [...(projectCode.issuedItems || []), ...newIssuedItems];
   batch.update(codeRef, cleanForFirestore({
-    issuedItems: updatedIssuedItems
+    issuedItems: updatedIssuedItems,
+    studentRegNumbers: allTeamRegNumbers,
+    facultyEmployeeId,
+    updatedAt: Timestamp.now()
   }));
 
   // 5. Send consolidated Notifications to ALL team students and faculty
@@ -558,13 +581,14 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
 
   projectCode.students.forEach(student => {
     const notifRef = doc(collection(db, 'notifications'));
-    const isCollector = student.regNumber.toUpperCase() === selectedStudent.regNumber.toUpperCase();
+    const sReg = (student.regNumber || '').trim().toUpperCase();
+    const isCollector = sReg === cleanCollectorReg;
     const notif: NotificationItem = {
       id: notifRef.id,
-      targetRegNumber: student.regNumber.toUpperCase(),
+      targetRegNumber: sReg,
       roleTarget: 'student',
       title: `Hardware Issued (${items.length} items)`,
-      message: `${itemsSummary} issued to ${isCollector ? 'you' : selectedStudent.name} (${selectedStudent.regNumber}) under Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
+      message: `${itemsSummary} issued to ${isCollector ? 'you' : selectedStudent.name} (${cleanCollectorReg}) under Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
       type: 'component_issued',
       projectCode: projectCode.code,
       componentName: items.length === 1 ? items[0].component.name : `${items.length} components`,
@@ -583,10 +607,10 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
   const facultyNotifRef = doc(collection(db, 'notifications'));
   const facultyNotif: NotificationItem = {
     id: facultyNotifRef.id,
-    targetRegNumber: projectCode.faculty.employeeId.toUpperCase(),
+    targetRegNumber: facultyEmployeeId,
     roleTarget: 'faculty',
     title: `Hardware Issued under Code ${projectCode.code}`,
-    message: `${itemsSummary} issued to student ${selectedStudent.name} under Project Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
+    message: `${itemsSummary} issued to student ${selectedStudent.name} (${cleanCollectorReg}) under Project Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
     type: 'component_issued',
     projectCode: projectCode.code,
     componentName: items.length === 1 ? items[0].component.name : `${items.length} components`,
@@ -595,7 +619,7 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
     createdAt: Timestamp.now(),
     urgency: 'info'
   };
-  if (projectCode.faculty.uid) {
+  if (projectCode.faculty?.uid) {
     facultyNotif.userId = projectCode.faculty.uid;
   }
   batch.set(facultyNotifRef, cleanForFirestore(facultyNotif));

@@ -212,6 +212,14 @@ export default function ReturnLoan() {
           throw new Error('Inventory component record was not found.');
         }
 
+        // Project Code read (must precede writes)
+        let codeRef: any = null;
+        let codeDoc: any = null;
+        if (currentTx.projectCode) {
+          codeRef = doc(db, 'project_codes', currentTx.projectCode);
+          codeDoc = await txn.get(codeRef);
+        }
+
         const currentComp = compDoc.data() as Component;
 
         const newReturnedTotal = currentReturned + returnQty;
@@ -274,6 +282,26 @@ export default function ReturnLoan() {
         }
 
         txn.update(txRef, updateTxPayload);
+
+        // Atomically update project code record if loan was issued under a code
+        if (codeRef && codeDoc && codeDoc.exists()) {
+          const codeData = codeDoc.data();
+          const existingIssued = codeData.issuedItems || [];
+          const updatedIssued = existingIssued.map((item: any) => {
+            if (item.transactionId === currentTx.id) {
+              return {
+                ...item,
+                returnedQuantity: newReturnedTotal,
+                status: finalStatus
+              };
+            }
+            return item;
+          });
+          txn.update(codeRef, {
+            issuedItems: updatedIssued,
+            updatedAt: Timestamp.now()
+          });
+        }
       });
 
       // Update local view state

@@ -39,6 +39,7 @@ export interface Transaction {
   issueDate: any; // Firestore timestamp
   returnDate?: any; // Firestore timestamp
   issuedByAdminId: string;
+  issuedByAdminName?: string;
   returnedByAdminId?: string;
   returnedByAdminName?: string;
   condition?: 'Good' | 'Damaged' | 'Incomplete';
