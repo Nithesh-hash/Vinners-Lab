@@ -8,7 +8,8 @@ export interface UserProfile {
   email: string;
   name: string;
   regNumber?: string;
-  role: 'student' | 'admin';
+  mobileNumber?: string;
+  role: 'student' | 'faculty' | 'admin';
 }
 
 interface AuthContextType {

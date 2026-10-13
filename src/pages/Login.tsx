@@ -85,7 +85,7 @@ export default function Login() {
             onClick={() => handleTypeChange('student')}
             className={cn("flex-1 py-2 text-sm font-medium rounded-md transition-all", loginType === 'student' ? "bg-white text-slate-900 shadow-sm font-semibold" : "text-slate-500 hover:text-slate-700")}
           >
-            Student login
+            Student & Faculty
           </button>
           <button 
             type="button"

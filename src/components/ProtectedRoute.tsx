@@ -4,7 +4,7 @@ import React from 'react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles?: Array<'student' | 'admin'>;
+  allowedRoles?: Array<'student' | 'faculty' | 'admin'>;
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {

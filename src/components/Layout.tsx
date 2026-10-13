@@ -1,14 +1,16 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogOut, User, LayoutDashboard, History, Settings, X, Menu, QrCode } from 'lucide-react';
+import { LogOut, User, LayoutDashboard, History, Settings, X, Menu, QrCode, Bell } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import NotificationsModal from './NotificationsModal';
 
 export default function Layout() {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -50,6 +52,14 @@ export default function Layout() {
               </Link>
             </>
           )}
+          <button 
+            type="button" 
+            onClick={() => setIsNotificationsOpen(true)}
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer"
+          >
+            <Bell className="w-4 h-4" />
+            Alerts & Notifications
+          </button>
         </nav>
         
         <div className="mt-auto pt-4 border-t border-slate-100">
@@ -85,13 +95,22 @@ export default function Layout() {
             <img src="/logo.png" alt="Vinner Lab Logo" className="w-7 h-7 rounded-lg shadow-xs border border-slate-200 shrink-0" />
             <span className="text-base font-extrabold text-slate-900 tracking-tight">Vinner Lab</span>
           </div>
-          <button 
-            className="p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl border border-slate-200 transition-all cursor-pointer"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle navigation menu"
-          >
-            <Menu className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setIsNotificationsOpen(true)}
+              className="p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl border border-slate-200 transition-all cursor-pointer"
+              aria-label="Notifications"
+            >
+              <Bell className="w-4 h-4" />
+            </button>
+            <button 
+              className="p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl border border-slate-200 transition-all cursor-pointer"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle navigation menu"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+          </div>
         </header>
         
         <div className="flex-1 px-3.5 py-4 sm:px-6 md:p-8 overflow-y-auto overflow-x-hidden">
@@ -164,6 +183,12 @@ export default function Layout() {
           </div>
         </div>
       )}
+
+      {/* Global Notifications Modal */}
+      <NotificationsModal 
+        isOpen={isNotificationsOpen} 
+        onClose={() => setIsNotificationsOpen(false)} 
+      />
     </div>
   );
 }
