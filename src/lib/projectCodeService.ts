@@ -1,6 +1,6 @@
 import { collection, query, where, getDocs, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import type { ProjectCode, ProjectMember, ProjectFaculty, Component, NotificationItem } from '@/types';
+import type { ProjectCode, ProjectMember, ProjectFaculty, Component, NotificationItem, ProjectIssuedItem } from '@/types';
 
 /**
  * Returns current academic year format, e.g. "2026-27"
@@ -441,6 +441,167 @@ export async function issueComponentUnderProjectCode(params: {
 
   await batch.commit();
   return txRef.id;
+}
+
+/**
+ * Issues multiple hardware components together under a specific Project Code to a selected student in one atomic batch.
+ */
+export async function issueMultipleComponentsUnderProjectCode(params: {
+  projectCode: ProjectCode;
+  selectedStudent: ProjectMember;
+  items: Array<{
+    component: Component;
+    quantity: number;
+  }>;
+  dueDate: Date;
+  adminId: string;
+  adminName: string;
+  notes?: string;
+}): Promise<string[]> {
+  const { projectCode, selectedStudent, items, dueDate, adminId, adminName, notes } = params;
+
+  if (items.length === 0) {
+    throw new Error('At least one component must be selected.');
+  }
+
+  // 1. Verify stock across items (grouping duplicates if any)
+  const qtyMap = new Map<string, number>();
+  for (const item of items) {
+    const cur = qtyMap.get(item.component.id) || 0;
+    qtyMap.set(item.component.id, cur + item.quantity);
+  }
+
+  for (const item of items) {
+    const totalRequested = qtyMap.get(item.component.id) || 0;
+    if (item.component.availableQuantity < totalRequested) {
+      throw new Error(`Insufficient stock for "${item.component.name}". Requested ${totalRequested}, but only ${item.component.availableQuantity} unit(s) available.`);
+    }
+  }
+
+  const batch = writeBatch(db);
+  const dueTimestamp = Timestamp.fromDate(dueDate);
+  const txIds: string[] = [];
+  const newIssuedItems: ProjectIssuedItem[] = [];
+
+  // 2. Create transactions for each component
+  for (const item of items) {
+    const txRef = doc(collection(db, 'transactions'));
+    txIds.push(txRef.id);
+
+    const transactionData = {
+      id: txRef.id,
+      componentId: item.component.id,
+      componentName: item.component.name,
+      studentId: selectedStudent.uid || '',
+      studentName: selectedStudent.name,
+      studentRegNumber: selectedStudent.regNumber.toUpperCase(),
+      studentEmail: selectedStudent.email || '',
+      quantity: item.quantity,
+      returnedQuantity: 0,
+      expectedReturnDate: dueTimestamp,
+      issueDate: Timestamp.now(),
+      status: 'Checked Out',
+      issuedByAdminId: adminId,
+      issuedByAdminName: adminName,
+      adminNotes: notes || '',
+      // Project Code Linkage
+      projectCode: projectCode.code,
+      facultyEmployeeId: projectCode.faculty.employeeId.toUpperCase(),
+      facultyName: projectCode.faculty.name,
+      facultyMobile: projectCode.faculty.mobileNumber,
+      teamStudentRegNumbers: projectCode.studentRegNumbers,
+      teamStudents: projectCode.students,
+      collectedByStudentName: selectedStudent.name,
+      collectedByStudentRegNumber: selectedStudent.regNumber.toUpperCase()
+    };
+    batch.set(txRef, cleanForFirestore(transactionData));
+
+    newIssuedItems.push({
+      transactionId: txRef.id,
+      componentId: item.component.id,
+      componentName: item.component.name,
+      quantity: item.quantity,
+      returnedQuantity: 0,
+      collectedByStudentName: selectedStudent.name,
+      collectedByStudentRegNumber: selectedStudent.regNumber.toUpperCase(),
+      issueDate: Timestamp.now(),
+      expectedReturnDate: dueTimestamp,
+      status: 'Checked Out' as const
+    });
+  }
+
+  // 3. Update inventory for each component
+  const updatedComps = new Set<string>();
+  for (const item of items) {
+    if (!updatedComps.has(item.component.id)) {
+      updatedComps.add(item.component.id);
+      const totalToDeduct = qtyMap.get(item.component.id) || item.quantity;
+      const compRef = doc(db, 'inventory', item.component.id);
+      batch.update(compRef, cleanForFirestore({
+        availableQuantity: item.component.availableQuantity - totalToDeduct,
+        issuedQuantity: item.component.issuedQuantity + totalToDeduct,
+        updatedAt: Timestamp.now()
+      }));
+    }
+  }
+
+  // 4. Update Project Code with all new issued items
+  const codeRef = doc(db, 'project_codes', projectCode.code);
+  const updatedIssuedItems = [...(projectCode.issuedItems || []), ...newIssuedItems];
+  batch.update(codeRef, cleanForFirestore({
+    issuedItems: updatedIssuedItems
+  }));
+
+  // 5. Send consolidated Notifications to ALL team students and faculty
+  const formattedDueDate = dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const itemsSummary = items.map(i => `${i.quantity}x ${i.component.name}`).join(', ');
+
+  projectCode.students.forEach(student => {
+    const notifRef = doc(collection(db, 'notifications'));
+    const isCollector = student.regNumber.toUpperCase() === selectedStudent.regNumber.toUpperCase();
+    const notif: NotificationItem = {
+      id: notifRef.id,
+      targetRegNumber: student.regNumber.toUpperCase(),
+      roleTarget: 'student',
+      title: `Hardware Issued (${items.length} items)`,
+      message: `${itemsSummary} issued to ${isCollector ? 'you' : selectedStudent.name} (${selectedStudent.regNumber}) under Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
+      type: 'component_issued',
+      projectCode: projectCode.code,
+      componentName: items.length === 1 ? items[0].component.name : `${items.length} components`,
+      dueDate: dueTimestamp,
+      isRead: false,
+      createdAt: Timestamp.now(),
+      urgency: 'info'
+    };
+    if (student.uid) {
+      notif.userId = student.uid;
+    }
+    batch.set(notifRef, cleanForFirestore(notif));
+  });
+
+  // Notification for faculty
+  const facultyNotifRef = doc(collection(db, 'notifications'));
+  const facultyNotif: NotificationItem = {
+    id: facultyNotifRef.id,
+    targetRegNumber: projectCode.faculty.employeeId.toUpperCase(),
+    roleTarget: 'faculty',
+    title: `Hardware Issued under Code ${projectCode.code}`,
+    message: `${itemsSummary} issued to student ${selectedStudent.name} under Project Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
+    type: 'component_issued',
+    projectCode: projectCode.code,
+    componentName: items.length === 1 ? items[0].component.name : `${items.length} components`,
+    dueDate: dueTimestamp,
+    isRead: false,
+    createdAt: Timestamp.now(),
+    urgency: 'info'
+  };
+  if (projectCode.faculty.uid) {
+    facultyNotif.userId = projectCode.faculty.uid;
+  }
+  batch.set(facultyNotifRef, cleanForFirestore(facultyNotif));
+
+  await batch.commit();
+  return txIds;
 }
 
 /**

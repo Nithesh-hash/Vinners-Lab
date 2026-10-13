@@ -7,12 +7,14 @@ import {
   Package, 
   Calendar, 
   Users, 
-  Check 
+  Check,
+  Plus,
+  Trash2 
 } from 'lucide-react';
-import { doc, getDoc, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { ProjectCode, ProjectMember, Component } from '@/types';
-import { issueComponentUnderProjectCode, getDueDateStatus } from '@/lib/projectCodeService';
+import { issueMultipleComponentsUnderProjectCode, getDueDateStatus } from '@/lib/projectCodeService';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Due date by default is 2 months from today (editable)
@@ -28,6 +30,12 @@ interface SearchCodeModalProps {
   inventory: Component[];
   onComponentIssued?: () => void;
   initialCode?: string;
+}
+
+interface IssueItemRow {
+  id: string;
+  componentId: string;
+  quantity: number;
 }
 
 export default function SearchCodeModal({
@@ -46,15 +54,36 @@ export default function SearchCodeModal({
   const [recentCodes, setRecentCodes] = useState<ProjectCode[]>([]);
   const [searchError, setSearchError] = useState('');
 
-  // Issuance state
+  // Issuance state (supports multiple components issued together)
   const [selectedStudent, setSelectedStudent] = useState<ProjectMember | null>(null);
-  const [selectedComponentId, setSelectedComponentId] = useState<string>('');
-  const [issueQuantity, setIssueQuantity] = useState<number>(1);
+  const [issueItems, setIssueItems] = useState<IssueItemRow[]>([
+    { id: 'item_1', componentId: '', quantity: 1 }
+  ]);
   const [dueDateStr, setDueDateStr] = useState<string>(getDefaultTwoMonthDueDate());
   const [adminNotes, setAdminNotes] = useState('');
   const [isIssuing, setIsIssuing] = useState(false);
   const [issueSuccessMsg, setIssueSuccessMsg] = useState('');
   const [issueError, setIssueError] = useState('');
+
+  const addIssueItemRow = () => {
+    setIssueItems(prev => [
+      ...prev,
+      { id: Math.random().toString(36).substring(2, 9), componentId: '', quantity: 1 }
+    ]);
+  };
+
+  const removeIssueItemRow = (index: number) => {
+    if (issueItems.length <= 1) return;
+    setIssueItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateIssueItemRow = (index: number, updates: Partial<IssueItemRow>) => {
+    setIssueItems(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], ...updates };
+      return copy;
+    });
+  };
 
   const loadRecentCodes = async () => {
     try {
@@ -103,6 +132,17 @@ export default function SearchCodeModal({
     }
   };
 
+  // Real-time listener for active project code to lively reflect changes
+  useEffect(() => {
+    if (!activeProjectCode?.code) return;
+    const unsub = onSnapshot(doc(db, 'project_codes', activeProjectCode.code), (snap) => {
+      if (snap.exists()) {
+        setActiveProjectCode({ id: snap.id, ...snap.data() } as ProjectCode);
+      }
+    });
+    return () => unsub();
+  }, [activeProjectCode?.code]);
+
   useEffect(() => {
     if (isOpen) {
       loadRecentCodes();
@@ -114,8 +154,7 @@ export default function SearchCodeModal({
       // Reset
       setActiveProjectCode(null);
       setSelectedStudent(null);
-      setSelectedComponentId('');
-      setIssueQuantity(1);
+      setIssueItems([{ id: 'item_1', componentId: '', quantity: 1 }]);
       setIssueSuccessMsg('');
       setIssueError('');
       setSearchError('');
@@ -126,23 +165,44 @@ export default function SearchCodeModal({
     e.preventDefault();
     if (!activeProjectCode) return;
     if (!selectedStudent) {
-      setIssueError('Please select which student is collecting the component.');
-      return;
-    }
-    if (!selectedComponentId) {
-      setIssueError('Please select a hardware component to issue.');
+      setIssueError('Please select which student is collecting the component(s).');
       return;
     }
 
-    const component = inventory.find(i => i.id === selectedComponentId);
-    if (!component) {
-      setIssueError('Selected component was not found in inventory.');
-      return;
+    // Validate all items
+    for (let i = 0; i < issueItems.length; i++) {
+      const row = issueItems[i];
+      if (!row.componentId) {
+        setIssueError(`Please select a component for Component Item #${i + 1}.`);
+        return;
+      }
+      if (row.quantity < 1) {
+        setIssueError(`Quantity for Component Item #${i + 1} must be at least 1.`);
+        return;
+      }
     }
 
-    if (component.availableQuantity < issueQuantity) {
-      setIssueError(`Only ${component.availableQuantity} unit(s) available in stock.`);
-      return;
+    // Check inventory stock and aggregate duplicate component requests
+    const itemsToIssue: Array<{ component: Component; quantity: number }> = [];
+    const requestedQuantities = new Map<string, number>();
+
+    for (const row of issueItems) {
+      const comp = inventory.find(i => i.id === row.componentId);
+      if (!comp) {
+        setIssueError('One of the selected components was not found in inventory.');
+        return;
+      }
+      const cur = requestedQuantities.get(comp.id) || 0;
+      requestedQuantities.set(comp.id, cur + row.quantity);
+      itemsToIssue.push({ component: comp, quantity: row.quantity });
+    }
+
+    for (const [compId, totalQty] of requestedQuantities.entries()) {
+      const comp = inventory.find(i => i.id === compId);
+      if (comp && comp.availableQuantity < totalQty) {
+        setIssueError(`Insufficient stock for "${comp.name}". Requested ${totalQty}, but only ${comp.availableQuantity} unit(s) available.`);
+        return;
+      }
     }
 
     if (!dueDateStr) {
@@ -156,11 +216,10 @@ export default function SearchCodeModal({
 
     try {
       const selectedDueDate = new Date(`${dueDateStr}T23:59:59`);
-      await issueComponentUnderProjectCode({
+      await issueMultipleComponentsUnderProjectCode({
         projectCode: activeProjectCode,
         selectedStudent,
-        component,
-        quantity: issueQuantity,
+        items: itemsToIssue,
         dueDate: selectedDueDate,
         adminId: profile?.uid || 'admin',
         adminName: profile?.name || 'Administrator',
@@ -173,9 +232,10 @@ export default function SearchCodeModal({
         setActiveProjectCode({ id: updatedSnap.id, ...updatedSnap.data() } as ProjectCode);
       }
 
-      setIssueSuccessMsg(`Successfully issued ${issueQuantity}x "${component.name}" to ${selectedStudent.name} (${selectedStudent.regNumber}) under Code ${activeProjectCode.code}!`);
-      setSelectedComponentId('');
-      setIssueQuantity(1);
+      const summaryText = itemsToIssue.map(i => `${i.quantity}x "${i.component.name}"`).join(', ');
+      setIssueSuccessMsg(`Successfully issued ${itemsToIssue.length} component(s) (${summaryText}) together to ${selectedStudent.name} (${selectedStudent.regNumber}) under Code ${activeProjectCode.code}!`);
+      
+      setIssueItems([{ id: Math.random().toString(36).substring(2, 9), componentId: '', quantity: 1 }]);
       setAdminNotes('');
       // Reset due date back to default 2 months
       setDueDateStr(getDefaultTwoMonthDueDate());
@@ -192,8 +252,6 @@ export default function SearchCodeModal({
   };
 
   if (!isOpen) return null;
-
-  const selectedComp = inventory.find(i => i.id === selectedComponentId);
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto font-sans">
@@ -409,71 +467,126 @@ export default function SearchCodeModal({
 
               {/* SECTION: HARDWARE COMPONENT & DUE DATE FORM */}
               <form onSubmit={handleIssueComponent} className="border border-slate-200/90 rounded-2xl p-4 sm:p-5 bg-white shadow-2xs space-y-4">
-                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
-                    <Package className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-extrabold text-slate-900">
-                      Component & Loan Schedule
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      Default loan due date is 2 months (customizable) with approaching due date notifications
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {/* Component Selector */}
-                  <div className="sm:col-span-1">
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Lab Component *
-                    </label>
-                    <select
-                      required
-                      value={selectedComponentId}
-                      onChange={e => {
-                        setSelectedComponentId(e.target.value);
-                        setIssueQuantity(1);
-                      }}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black"
-                    >
-                      <option value="">-- Choose hardware component --</option>
-                      {inventory.map(item => (
-                        <option 
-                          key={item.id} 
-                          value={item.id}
-                          disabled={item.availableQuantity <= 0}
-                        >
-                          {item.name} ({item.availableQuantity} available) - {item.category}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Quantity to Issue */}
-                  <div className="sm:col-span-1">
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Issue Quantity *
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        max={selectedComp ? selectedComp.availableQuantity : 99}
-                        required
-                        value={issueQuantity}
-                        onChange={e => setIssueQuantity(Math.max(1, Number(e.target.value)))}
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-900 font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-black"
-                      />
-                      {selectedComp && (
-                        <span className="text-[11px] text-slate-500 whitespace-nowrap">
-                          / {selectedComp.availableQuantity} max
-                        </span>
-                      )}
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
+                      <Package className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-slate-900">
+                        Component & Loan Schedule
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Add multiple hardware components to be issued together under this code
+                      </p>
                     </div>
                   </div>
 
+                  <button
+                    type="button"
+                    onClick={addIssueItemRow}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 hover:bg-black text-white text-[11px] font-bold shadow-2xs transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Component
+                  </button>
+                </div>
+
+                {/* DYNAMIC LIST OF COMPONENTS TO ISSUE */}
+                <div className="space-y-3">
+                  {issueItems.map((item, index) => {
+                    const selectedComp = inventory.find(i => i.id === item.componentId);
+                    return (
+                      <div 
+                        key={item.id} 
+                        className="p-3 sm:p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/60 space-y-2 hover:border-slate-300 transition-all"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 text-[10px] flex items-center justify-center font-black">
+                              {index + 1}
+                            </span>
+                            Component Item #{index + 1}
+                          </span>
+
+                          {issueItems.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeIssueItemRow(index)}
+                              className="text-slate-400 hover:text-red-600 p-1 rounded-md transition-colors cursor-pointer"
+                              title="Remove component"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                          {/* Component Selector */}
+                          <div className="sm:col-span-8">
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                              Lab Component *
+                            </label>
+                            <select
+                              required
+                              value={item.componentId}
+                              onChange={e => {
+                                updateIssueItemRow(index, { componentId: e.target.value, quantity: 1 });
+                              }}
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-black"
+                            >
+                              <option value="">-- Choose hardware component --</option>
+                              {inventory.map(comp => (
+                                <option 
+                                  key={comp.id} 
+                                  value={comp.id}
+                                  disabled={comp.availableQuantity <= 0}
+                                >
+                                  {comp.name} ({comp.availableQuantity} available) - {comp.category}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Quantity to Issue */}
+                          <div className="sm:col-span-4">
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                              Issue Quantity *
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="1"
+                                max={selectedComp ? selectedComp.availableQuantity : 99}
+                                required
+                                value={item.quantity}
+                                onChange={e => updateIssueItemRow(index, { quantity: Math.max(1, Number(e.target.value)) })}
+                                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-black"
+                              />
+                              {selectedComp && (
+                                <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                                  / {selectedComp.availableQuantity} max
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Add another component dashed button */}
+                  <button
+                    type="button"
+                    onClick={addIssueItemRow}
+                    className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-slate-200 hover:border-slate-400 bg-slate-50/40 hover:bg-slate-100/60 text-slate-700 hover:text-black text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-4 h-4 text-emerald-600" />
+                    <span>Add Another Component to Issue Together</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                   {/* DUE DATE (Default 2 months, editable) */}
                   <div className="sm:col-span-2 bg-indigo-50/60 rounded-2xl p-3.5 border border-indigo-100 space-y-2">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
@@ -518,18 +631,18 @@ export default function SearchCodeModal({
                 <div className="pt-2 flex justify-end">
                   <button
                     type="submit"
-                    disabled={isIssuing || !selectedStudent || !selectedComponentId}
+                    disabled={isIssuing || !selectedStudent || issueItems.some(i => !i.componentId)}
                     className="w-full sm:w-auto px-6 py-3 rounded-full bg-slate-900 hover:bg-black text-white text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     {isIssuing ? (
                       <>
                         <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Issuing Component...
+                        Issuing Components Together...
                       </>
                     ) : (
                       <>
                         <Package className="w-4 h-4 text-emerald-300" />
-                        Issue Component to {selectedStudent?.name || 'Selected Student'}
+                        Issue {issueItems.length > 1 ? `${issueItems.length} Components Together` : 'Component'} to {selectedStudent?.name || 'Selected Student'}
                       </>
                     )}
                   </button>
