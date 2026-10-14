@@ -95,9 +95,12 @@ export interface ProjectCode {
   codeType: 'SSV' | 'FSV';
   academicYear: string; // e.g. "2026-27"
   faculty: ProjectFaculty;
+  faculty2?: ProjectFaculty;
+  faculties?: ProjectFaculty[];
   students: ProjectMember[];
   studentRegNumbers: string[]; // Uppercase array for querying
-  facultyEmployeeId: string; // Uppercase for querying
+  facultyEmployeeId: string; // Uppercase for querying (Faculty 1)
+  facultyEmployeeIds?: string[]; // Uppercase array for querying (Faculty 1 and Faculty 2)
   createdAt: any;
   createdByAdminId: string;
   createdByName?: string;

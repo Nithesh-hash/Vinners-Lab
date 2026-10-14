@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { doc, getDoc, collection, getDocs, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { ProjectCode, ProjectMember, Component } from '@/types';
+import type { ProjectCode, ProjectMember, Component, ProjectFaculty } from '@/types';
 import { issueMultipleComponentsUnderProjectCode, getDueDateStatus } from '@/lib/projectCodeService';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -396,10 +396,14 @@ export default function SearchCodeModal({
                 </div>
 
                 <div className="text-left sm:text-right bg-white/5 p-3 rounded-xl border border-white/10 sm:border-0 sm:bg-transparent sm:p-0">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Faculty Guide</span>
-                  <p className="font-bold text-white text-sm">{activeProjectCode.faculty.name}</p>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                    {activeProjectCode.faculty2 ? 'Faculty Guides' : 'Faculty Guide'}
+                  </span>
+                  <p className="font-bold text-white text-sm">
+                    {([activeProjectCode.faculty, activeProjectCode.faculty2].filter(Boolean) as ProjectFaculty[]).map(f => f.name).join(' & ')}
+                  </p>
                   <p className="text-xs text-slate-400 font-mono">
-                    ID: {activeProjectCode.faculty.employeeId} • {activeProjectCode.faculty.mobileNumber}
+                    {([activeProjectCode.faculty, activeProjectCode.faculty2].filter(Boolean) as ProjectFaculty[]).map(f => `${f.employeeId} (${f.mobileNumber})`).join(' • ')}
                   </p>
                 </div>
               </div>
@@ -412,7 +416,7 @@ export default function SearchCodeModal({
                     <p className="font-bold">Hardware Loan Dispatched</p>
                     <p className="font-normal mt-0.5">{issueSuccessMsg}</p>
                     <p className="text-[11px] text-emerald-600 mt-1">
-                      ✓ Instant notifications dispatched to faculty ({activeProjectCode.faculty.name}) and all {activeProjectCode.students.length} team students.
+                      ✓ Instant notifications dispatched to faculty ({([activeProjectCode.faculty, activeProjectCode.faculty2].filter(Boolean) as ProjectFaculty[]).map(f => f.name).join(' & ')}) and all {activeProjectCode.students.length} team students.
                     </p>
                   </div>
                 </div>

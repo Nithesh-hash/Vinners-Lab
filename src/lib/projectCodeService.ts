@@ -196,17 +196,21 @@ export async function createProjectCodeRecord(params: {
   code: string;
   codeType?: 'SSV' | 'FSV';
   faculty: ProjectFaculty;
+  faculty2?: ProjectFaculty;
+  faculties?: ProjectFaculty[];
   students: ProjectMember[];
   adminId: string;
   adminName: string;
 }): Promise<ProjectCode> {
-  const { code, faculty, students, adminId, adminName } = params;
+  const { code, faculty, faculty2, faculties, students, adminId, adminName } = params;
   const codeType: 'SSV' | 'FSV' = params.codeType || (code.startsWith('FSV') ? 'FSV' : 'SSV');
   const acadYear = getAcademicYear();
   const batch = writeBatch(db);
 
   const codeRef = doc(db, 'project_codes', code);
   const studentRegNumbers = Array.from(new Set(students.map(s => (s.regNumber || '').trim().toUpperCase()).filter(Boolean)));
+  
+  // Faculty #1 (Compulsory)
   const facultyEmployeeId = (faculty.employeeId || '').trim().toUpperCase();
   const facultyEmail = (faculty.email || '').trim().toLowerCase();
 
@@ -217,6 +221,25 @@ export async function createProjectCodeRecord(params: {
   };
   if (facultyEmail) sanitizedFaculty.email = facultyEmail;
   if (faculty.uid) sanitizedFaculty.uid = faculty.uid.trim();
+
+  // Faculty #2 (Optional)
+  let sanitizedFaculty2: ProjectFaculty | undefined = undefined;
+  if (faculty2 && faculty2.name?.trim() && faculty2.employeeId?.trim()) {
+    const f2Id = faculty2.employeeId.trim().toUpperCase();
+    sanitizedFaculty2 = {
+      name: faculty2.name.trim(),
+      employeeId: f2Id,
+      mobileNumber: (faculty2.mobileNumber || '').trim()
+    };
+    if (faculty2.email) sanitizedFaculty2.email = faculty2.email.trim().toLowerCase();
+    if (faculty2.uid) sanitizedFaculty2.uid = faculty2.uid.trim();
+  }
+
+  const allFaculties: ProjectFaculty[] = faculties && faculties.length > 0
+    ? faculties
+    : ([sanitizedFaculty, sanitizedFaculty2].filter(Boolean) as ProjectFaculty[]);
+
+  const facultyEmployeeIds = Array.from(new Set(allFaculties.map(f => (f.employeeId || '').trim().toUpperCase()).filter(Boolean)));
 
   const sanitizedStudents: ProjectMember[] = students.map(s => {
     const item: ProjectMember = {
@@ -241,9 +264,12 @@ export async function createProjectCodeRecord(params: {
     codeType,
     academicYear: acadYear,
     faculty: sanitizedFaculty,
+    ...(sanitizedFaculty2 ? { faculty2: sanitizedFaculty2 } : {}),
+    faculties: allFaculties,
     students: sanitizedStudents,
     studentRegNumbers,
     facultyEmployeeId,
+    facultyEmployeeIds,
     createdAt: Timestamp.now(),
     createdByAdminId: adminId,
     createdByName: adminName,
@@ -262,7 +288,7 @@ export async function createProjectCodeRecord(params: {
       targetRegNumber: student.regNumber.toUpperCase(),
       roleTarget: 'student',
       title: `Project Code Assigned: ${code}`,
-      message: `You have been added to Project Code ${code} guided by Faculty ${sanitizedFaculty.name}. You can now collect authorized hardware components from Vinner Lab.`,
+      message: `You have been added to Project Code ${code} guided by Faculty ${allFaculties.map(f => f.name).join(' & ')}. You can now collect authorized hardware components from Vinner Lab.`,
       type: 'code_generated',
       projectCode: code,
       isRead: false,
@@ -275,24 +301,28 @@ export async function createProjectCodeRecord(params: {
     batch.set(notifRef, cleanForFirestore(notif));
   });
 
-  // Automatically dispatch notification to faculty guide
-  const facultyNotifRef = doc(collection(db, 'notifications'));
-  const facultyNotif: NotificationItem = {
-    id: facultyNotifRef.id,
-    targetRegNumber: facultyEmployeeId,
-    roleTarget: 'faculty',
-    title: `Project Code Registered: ${code}`,
-    message: `Project Code ${code} has been registered with ${sanitizedStudents.length} students under your guidance (${sanitizedFaculty.name}). Component checkouts will be tracked under this code.`,
-    type: 'code_generated',
-    projectCode: code,
-    isRead: false,
-    createdAt: Timestamp.now(),
-    urgency: 'info'
-  };
-  if (sanitizedFaculty.uid) {
-    facultyNotif.userId = sanitizedFaculty.uid;
-  }
-  batch.set(facultyNotifRef, cleanForFirestore(facultyNotif));
+  // Automatically dispatch notification to all faculty guides
+  allFaculties.forEach(fac => {
+    const facId = (fac.employeeId || '').trim().toUpperCase();
+    if (!facId) return;
+    const facultyNotifRef = doc(collection(db, 'notifications'));
+    const facultyNotif: NotificationItem = {
+      id: facultyNotifRef.id,
+      targetRegNumber: facId,
+      roleTarget: 'faculty',
+      title: `Project Code Registered: ${code}`,
+      message: `Project Code ${code} has been registered with ${sanitizedStudents.length} students under your guidance (${fac.name}). Component checkouts will be tracked under this code.`,
+      type: 'code_generated',
+      projectCode: code,
+      isRead: false,
+      createdAt: Timestamp.now(),
+      urgency: 'info'
+    };
+    if (fac.uid) {
+      facultyNotif.userId = fac.uid;
+    }
+    batch.set(facultyNotifRef, cleanForFirestore(facultyNotif));
+  });
 
   await batch.commit();
   return projectCodeData;
@@ -431,11 +461,21 @@ export async function issueComponentUnderProjectCode(params: {
     status: 'Checked Out'
   };
 
+  const activeFaculties: ProjectFaculty[] = projectCode.faculties && projectCode.faculties.length > 0
+    ? projectCode.faculties
+    : ([projectCode.faculty, projectCode.faculty2].filter(Boolean) as ProjectFaculty[]);
+  const facultyEmployeeIds = Array.from(new Set([
+    facultyEmployeeId,
+    ...(projectCode.facultyEmployeeIds || []),
+    ...activeFaculties.map(f => (f.employeeId || '').trim().toUpperCase())
+  ].filter(Boolean)));
+
   const updatedIssuedItems = [...(projectCode.issuedItems || []), newIssuedItem];
   batch.update(codeRef, cleanForFirestore({
     issuedItems: updatedIssuedItems,
     studentRegNumbers: allTeamRegNumbers,
     facultyEmployeeId,
+    facultyEmployeeIds,
     updatedAt: Timestamp.now()
   }));
 
@@ -467,26 +507,30 @@ export async function issueComponentUnderProjectCode(params: {
     batch.set(notifRef, cleanForFirestore(notif));
   });
 
-  // Notification for faculty
-  const facultyNotifRef = doc(collection(db, 'notifications'));
-  const facultyNotif: NotificationItem = {
-    id: facultyNotifRef.id,
-    targetRegNumber: facultyEmployeeId,
-    roleTarget: 'faculty',
-    title: `Component Issued for Code ${projectCode.code}`,
-    message: `${quantity}x ${component.name} issued to student ${selectedStudent.name} (${cleanCollectorReg}) under Project Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
-    type: 'component_issued',
-    projectCode: projectCode.code,
-    componentName: component.name,
-    dueDate: dueTimestamp,
-    isRead: false,
-    createdAt: Timestamp.now(),
-    urgency: 'info'
-  };
-  if (projectCode.faculty?.uid) {
-    facultyNotif.userId = projectCode.faculty.uid;
-  }
-  batch.set(facultyNotifRef, cleanForFirestore(facultyNotif));
+  // Notifications for all faculty guides
+  activeFaculties.forEach(fac => {
+    const fId = (fac.employeeId || '').trim().toUpperCase();
+    if (!fId) return;
+    const facultyNotifRef = doc(collection(db, 'notifications'));
+    const facultyNotif: NotificationItem = {
+      id: facultyNotifRef.id,
+      targetRegNumber: fId,
+      roleTarget: 'faculty',
+      title: `Component Issued for Code ${projectCode.code}`,
+      message: `${quantity}x ${component.name} issued to student ${selectedStudent.name} (${cleanCollectorReg}) under Project Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
+      type: 'component_issued',
+      projectCode: projectCode.code,
+      componentName: component.name,
+      dueDate: dueTimestamp,
+      isRead: false,
+      createdAt: Timestamp.now(),
+      urgency: 'info'
+    };
+    if (fac.uid) {
+      facultyNotif.userId = fac.uid;
+    }
+    batch.set(facultyNotifRef, cleanForFirestore(facultyNotif));
+  });
 
   await batch.commit();
   return txRef.id;
@@ -643,26 +687,34 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
     batch.set(notifRef, cleanForFirestore(notif));
   });
 
-  // Notification for faculty
-  const facultyNotifRef = doc(collection(db, 'notifications'));
-  const facultyNotif: NotificationItem = {
-    id: facultyNotifRef.id,
-    targetRegNumber: facultyEmployeeId,
-    roleTarget: 'faculty',
-    title: `Hardware Issued under Code ${projectCode.code}`,
-    message: `${itemsSummary} issued to student ${selectedStudent.name} (${cleanCollectorReg}) under Project Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
-    type: 'component_issued',
-    projectCode: projectCode.code,
-    componentName: items.length === 1 ? items[0].component.name : `${items.length} components`,
-    dueDate: dueTimestamp,
-    isRead: false,
-    createdAt: Timestamp.now(),
-    urgency: 'info'
-  };
-  if (projectCode.faculty?.uid) {
-    facultyNotif.userId = projectCode.faculty.uid;
-  }
-  batch.set(facultyNotifRef, cleanForFirestore(facultyNotif));
+  // Notifications for all faculty guides
+  const activeFaculties: ProjectFaculty[] = projectCode.faculties && projectCode.faculties.length > 0
+    ? projectCode.faculties
+    : ([projectCode.faculty, projectCode.faculty2].filter(Boolean) as ProjectFaculty[]);
+
+  activeFaculties.forEach(fac => {
+    const fId = (fac.employeeId || '').trim().toUpperCase();
+    if (!fId) return;
+    const facultyNotifRef = doc(collection(db, 'notifications'));
+    const facultyNotif: NotificationItem = {
+      id: facultyNotifRef.id,
+      targetRegNumber: fId,
+      roleTarget: 'faculty',
+      title: `Hardware Issued under Code ${projectCode.code}`,
+      message: `${itemsSummary} issued to student ${selectedStudent.name} (${cleanCollectorReg}) under Project Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
+      type: 'component_issued',
+      projectCode: projectCode.code,
+      componentName: items.length === 1 ? items[0].component.name : `${items.length} components`,
+      dueDate: dueTimestamp,
+      isRead: false,
+      createdAt: Timestamp.now(),
+      urgency: 'info'
+    };
+    if (fac.uid) {
+      facultyNotif.userId = fac.uid;
+    }
+    batch.set(facultyNotifRef, cleanForFirestore(facultyNotif));
+  });
 
   await batch.commit();
   return txIds;

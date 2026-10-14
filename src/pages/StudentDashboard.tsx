@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Transaction, Component, ProjectCode } from '@/types';
+import type { Transaction, Component, ProjectCode, ProjectFaculty } from '@/types';
 import { 
   Search, 
   AlertCircle, 
@@ -116,15 +116,14 @@ export default function StudentDashboard() {
     };
 
     // 1. Fetch Project Codes
-    let codeQuery;
-    if (isFaculty) {
-      codeQuery = query(collection(db, 'project_codes'), where('facultyEmployeeId', '==', userReg));
-    } else {
-      codeQuery = query(collection(db, 'project_codes'), where('studentRegNumbers', 'array-contains', userReg));
-    }
+    const codeMap = new Map<string, ProjectCode>();
+    const unsubCodesList: (() => void)[] = [];
 
-    const unsubCodes = onSnapshot(codeQuery, (snap) => {
-      const codeList = snap.docs.map(d => ({ id: d.id, ...d.data() } as ProjectCode));
+    const handleCodesSnapshot = (snap: any) => {
+      snap.docs.forEach((d: any) => {
+        codeMap.set(d.id, { id: d.id, ...d.data() } as ProjectCode);
+      });
+      const codeList = Array.from(codeMap.values());
       codeList.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setProjectCodes(codeList);
       setLoading(false);
@@ -147,11 +146,22 @@ export default function StudentDashboard() {
         });
         codeTxUnsubs.push(u);
       });
-    }, (err) => {
-      console.warn("Error fetching project codes:", err);
-      setErrorMsg(err.message);
-      setLoading(false);
-    });
+    };
+
+    if (isFaculty) {
+      // Listen to both single facultyEmployeeId and array facultyEmployeeIds
+      const qFac1 = query(collection(db, 'project_codes'), where('facultyEmployeeId', '==', userReg));
+      const qFacAll = query(collection(db, 'project_codes'), where('facultyEmployeeIds', 'array-contains', userReg));
+      unsubCodesList.push(onSnapshot(qFac1, handleCodesSnapshot, err => console.warn(err)));
+      unsubCodesList.push(onSnapshot(qFacAll, handleCodesSnapshot, err => console.warn(err)));
+    } else {
+      const qStudent = query(collection(db, 'project_codes'), where('studentRegNumbers', 'array-contains', userReg));
+      unsubCodesList.push(onSnapshot(qStudent, handleCodesSnapshot, (err) => {
+        console.warn("Error fetching project codes:", err);
+        setErrorMsg(err.message);
+        setLoading(false);
+      }));
+    }
 
     let unsubPersonalTx = () => {};
     let unsubTeamTx = () => {};
@@ -210,7 +220,7 @@ export default function StudentDashboard() {
     }
 
     return () => {
-      unsubCodes();
+      unsubCodesList.forEach(u => u());
       codeTxUnsubs.forEach(u => u());
       unsubPersonalTx();
       unsubTeamTx();
@@ -483,18 +493,24 @@ export default function StudentDashboard() {
                     </div>
 
                     {/* Faculty Guide Info */}
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <GraduationCap className="w-4 h-4 text-indigo-600" />
-                        <div>
-                          <span className="text-[10px] text-slate-400 uppercase font-bold block">Faculty Guide</span>
-                          <span className="font-bold text-slate-900">{pc.faculty.name}</span>
+                    <div className="space-y-1.5">
+                      {([pc.faculty, pc.faculty2].filter(Boolean) as ProjectFaculty[]).map((fac, fIdx) => (
+                        <div key={fIdx} className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <GraduationCap className="w-4 h-4 text-indigo-600" />
+                            <div>
+                              <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                                {pc.faculty2 ? `Faculty Guide #${fIdx + 1}` : 'Faculty Guide'}
+                              </span>
+                              <span className="font-bold text-slate-900">{fac.name}</span>
+                            </div>
+                          </div>
+                          <div className="text-right text-[10px] font-mono text-slate-500">
+                            <p>{fac.employeeId}</p>
+                            <p>📞 {fac.mobileNumber}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-right text-[10px] font-mono text-slate-500">
-                        <p>{pc.faculty.employeeId}</p>
-                        <p>📞 {pc.faculty.mobileNumber}</p>
-                      </div>
+                      ))}
                     </div>
 
                     {/* Students Team List */}

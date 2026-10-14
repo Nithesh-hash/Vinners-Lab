@@ -3,7 +3,6 @@ import {
   X, 
   Plus, 
   CheckCircle2, 
-  AlertCircle, 
   AlertTriangle,
   Copy, 
   Check, 
@@ -20,6 +19,19 @@ interface GenerateCodeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCodeCreated?: (code: ProjectCode) => void;
+}
+
+interface FacultyFormItem {
+  id: string;
+  name: string;
+  employeeId: string;
+  mobileNumber: string;
+  isVerified: boolean;
+  verifying: boolean;
+  verifiedUser?: any;
+  uid?: string;
+  email?: string;
+  error?: string;
 }
 
 interface StudentFormItem {
@@ -44,25 +56,21 @@ export default function GenerateCodeModal({ isOpen, onClose, onCodeCreated }: Ge
   const [generatedCode, setGeneratedCode] = useState('');
   const [loadingCode, setLoadingCode] = useState(true);
 
-  // Faculty state (Single faculty, all 3 fields compulsory)
-  const [faculty, setFaculty] = useState<ProjectFaculty>({
-    name: '',
-    employeeId: '',
-    mobileNumber: ''
-  });
-  const [facultyVerifying, setFacultyVerifying] = useState(false);
-  const [facultyVerified, setFacultyVerified] = useState(false);
-  const [facultyError, setFacultyError] = useState('');
+  // Faculty state (2 slots: Faculty #1 Compulsory, Faculty #2 Optional)
+  const createInitialFaculties = (): FacultyFormItem[] => [
+    { id: '1', name: '', employeeId: '', mobileNumber: '', isVerified: false, verifying: false },
+    { id: '2', name: '', employeeId: '', mobileNumber: '', isVerified: false, verifying: false }
+  ];
 
-const createInitialStudents = (): StudentFormItem[] => [
-  { id: '1', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false },
-  { id: '2', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false },
-  { id: '3', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false },
-  { id: '4', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false },
-  { id: '5', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false }
-];
+  const [faculties, setFaculties] = useState<FacultyFormItem[]>(createInitialFaculties());
 
-  // Students list state (5 fixed slots: 2 compulsory, 3 optional)
+  // Students list state (3 fixed slots: 2 compulsory, 1 optional)
+  const createInitialStudents = (): StudentFormItem[] => [
+    { id: '1', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false },
+    { id: '2', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false },
+    { id: '3', name: '', regNumber: '', mobileNumber: '', isVerified: false, verifying: false }
+  ];
+
   const [students, setStudents] = useState<StudentFormItem[]>(createInitialStudents());
 
   // Submission state
@@ -94,45 +102,68 @@ const createInitialStudents = (): StudentFormItem[] => [
       setStep('select_type');
       setCreatedCodeResult(null);
       setFormError('');
+      setFaculties(createInitialFaculties());
       setStudents(createInitialStudents());
     }
   }, [isOpen]);
 
+  const updateFaculty = (index: number, updates: Partial<FacultyFormItem>) => {
+    setFaculties(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], ...updates };
+      return copy;
+    });
+  };
+
   // Real-time verification for Faculty
-  const handleVerifyFaculty = async (employeeIdToVerify?: string) => {
-    const id = employeeIdToVerify ?? faculty.employeeId;
-    if (!id.trim()) {
-      setFacultyError('Please enter Faculty Employee ID to verify');
-      setFacultyVerified(false);
+  const handleVerifyFaculty = async (facultyIndex: number, employeeIdToVerify?: string) => {
+    const targetFaculty = faculties[facultyIndex];
+    const id = (employeeIdToVerify ?? targetFaculty.employeeId).trim().toUpperCase();
+    if (!id) {
+      updateFaculty(facultyIndex, { error: 'Please enter Faculty Employee ID to verify', isVerified: false });
       return;
     }
 
-    setFacultyVerifying(true);
-    setFacultyError('');
+    // Check if duplicate with other faculty
+    const otherIndex = facultyIndex === 0 ? 1 : 0;
+    if (faculties[otherIndex].employeeId.trim().toUpperCase() === id) {
+      updateFaculty(facultyIndex, {
+        error: `Faculty Employee ID cannot be the same as Faculty Guide #${otherIndex + 1}`,
+        isVerified: false
+      });
+      return;
+    }
+
+    updateFaculty(facultyIndex, { verifying: true, error: undefined });
 
     try {
       const res = await verifyUserInPortal(id);
       if (res.exists && res.user) {
-        setFacultyVerified(true);
-        // Auto-fill faculty name and phone if present and blank
         const userMobile = (res.user.mobileNumber || '').replace(/\D/g, '').slice(0, 10);
-        setFaculty(prev => ({
-          ...prev,
-          employeeId: res.user!.regNumber || id.toUpperCase(),
-          name: prev.name.trim() ? prev.name : res.user!.name,
-          mobileNumber: prev.mobileNumber.trim() ? prev.mobileNumber : userMobile,
-          uid: res.user!.uid,
-          email: res.user!.email
-        }));
+        updateFaculty(facultyIndex, {
+          verifying: false,
+          isVerified: true,
+          verifiedUser: res.user,
+          employeeId: res.user.regNumber || id,
+          name: targetFaculty.name.trim() ? targetFaculty.name : res.user.name,
+          mobileNumber: targetFaculty.mobileNumber.trim() ? targetFaculty.mobileNumber : userMobile,
+          uid: res.user.uid,
+          email: res.user.email,
+          error: undefined
+        });
       } else {
-        setFacultyVerified(false);
-        setFacultyError(`No registered user found with Employee ID "${id.toUpperCase()}". Faculty must be registered in the portal.`);
+        updateFaculty(facultyIndex, {
+          verifying: false,
+          isVerified: false,
+          error: `No registered user found with Employee ID "${id}". Faculty must be registered in the portal.`
+        });
       }
     } catch {
-      setFacultyVerified(false);
-      setFacultyError('Verification check failed. Please try again.');
-    } finally {
-      setFacultyVerifying(false);
+      updateFaculty(facultyIndex, {
+        verifying: false,
+        isVerified: false,
+        error: 'Verification check failed. Please check network connection and try again.'
+      });
     }
   };
 
@@ -189,25 +220,85 @@ const createInitialStudents = (): StudentFormItem[] => [
     e.preventDefault();
     setFormError('');
 
-    // 1. Validate Faculty (Name, Employee ID, Mobile Number compulsory + strictly 10 digits)
-    if (!faculty.name.trim() || !faculty.employeeId.trim() || !faculty.mobileNumber.trim()) {
-      setFormError('All 3 faculty fields (Name, Employee ID, Mobile Number) are compulsory.');
+    // 1. Validate Faculty Guide #1 (Compulsory: Name, Employee ID, Mobile Number strictly 10 digits)
+    const fac1 = faculties[0];
+    if (!fac1.name.trim() || !fac1.employeeId.trim() || !fac1.mobileNumber.trim()) {
+      setFormError('Faculty Guide #1 is compulsory. Please enter Employee ID, Faculty Name, and Mobile Number.');
       return;
     }
 
-    const facMobile = faculty.mobileNumber.trim();
-    if (facMobile.length !== 10 || !/^\d{10}$/.test(facMobile)) {
-      setFormError('Faculty mobile number must be exactly 10 digits.');
+    const fac1Mobile = fac1.mobileNumber.trim();
+    if (fac1Mobile.length !== 10 || !/^\d{10}$/.test(fac1Mobile)) {
+      setFormError('Faculty Guide #1 mobile number must be exactly 10 digits.');
       return;
     }
 
-    if (!facultyVerified) {
-      setFormError(`Faculty with Employee ID "${faculty.employeeId.toUpperCase()}" must be verified in the portal.`);
-      return;
+    if (!fac1.isVerified) {
+      const checkRes = await verifyUserInPortal(fac1.employeeId.trim());
+      if (checkRes.exists && checkRes.user) {
+        const userMobile = (checkRes.user.mobileNumber || '').replace(/\D/g, '').slice(0, 10);
+        updateFaculty(0, {
+          isVerified: true,
+          verifiedUser: checkRes.user,
+          employeeId: checkRes.user.regNumber || fac1.employeeId.trim().toUpperCase(),
+          name: fac1.name.trim() ? fac1.name : checkRes.user.name,
+          mobileNumber: fac1.mobileNumber.trim() ? fac1.mobileNumber : userMobile,
+          uid: checkRes.user.uid,
+          email: checkRes.user.email,
+          error: undefined
+        });
+      } else {
+        const msg = `Faculty Guide #1 with Employee ID "${fac1.employeeId.toUpperCase()}" must be verified in the portal.`;
+        updateFaculty(0, { error: msg });
+        setFormError(msg);
+        return;
+      }
     }
 
-    // 2. Validate Students: Exactly 5 slots (Student #1 and #2 Compulsory; #3, #4, #5 Optional)
-    // Validate Student #1 and Student #2 (Mandatory)
+    // 2. Validate Faculty Guide #2 (Optional: If partially filled, must provide all 3 fields, 10 digits mobile, and be verified)
+    const fac2 = faculties[1];
+    const hasFac2Input = fac2.name.trim() || fac2.employeeId.trim() || fac2.mobileNumber.trim();
+    if (hasFac2Input) {
+      if (!fac2.name.trim() || !fac2.employeeId.trim() || !fac2.mobileNumber.trim()) {
+        setFormError('Faculty Guide #2 is partially filled. All 3 fields (Employee ID, Name, Mobile Number) are required if adding a second faculty.');
+        return;
+      }
+
+      if (fac2.employeeId.trim().toUpperCase() === fac1.employeeId.trim().toUpperCase()) {
+        setFormError('Faculty Guide #1 and Faculty Guide #2 cannot have the same Employee ID.');
+        return;
+      }
+
+      const fac2Mobile = fac2.mobileNumber.trim();
+      if (fac2Mobile.length !== 10 || !/^\d{10}$/.test(fac2Mobile)) {
+        setFormError('Faculty Guide #2 mobile number must be exactly 10 digits.');
+        return;
+      }
+
+      if (!fac2.isVerified) {
+        const checkRes = await verifyUserInPortal(fac2.employeeId.trim());
+        if (checkRes.exists && checkRes.user) {
+          const userMobile = (checkRes.user.mobileNumber || '').replace(/\D/g, '').slice(0, 10);
+          updateFaculty(1, {
+            isVerified: true,
+            verifiedUser: checkRes.user,
+            employeeId: checkRes.user.regNumber || fac2.employeeId.trim().toUpperCase(),
+            name: fac2.name.trim() ? fac2.name : checkRes.user.name,
+            mobileNumber: fac2.mobileNumber.trim() ? fac2.mobileNumber : userMobile,
+            uid: checkRes.user.uid,
+            email: checkRes.user.email,
+            error: undefined
+          });
+        } else {
+          const msg = `Faculty Guide #2 with Employee ID "${fac2.employeeId.toUpperCase()}" must be verified in the portal.`;
+          updateFaculty(1, { error: msg });
+          setFormError(msg);
+          return;
+        }
+      }
+    }
+
+    // 3. Validate Students: Exactly 3 slots (Students #1 and #2 Compulsory; #3 Optional)
     for (let i = 0; i < 2; i++) {
       const s = students[i];
       if (!s.name.trim() || !s.regNumber.trim()) {
@@ -236,38 +327,36 @@ const createInitialStudents = (): StudentFormItem[] => [
       }
     }
 
-    // Validate Student #3, #4, #5 (Optional: If partially filled, must provide both Name and Reg No and be verified)
-    for (let i = 2; i < 5; i++) {
-      const s = students[i];
-      const hasAnyInput = s.name.trim() || s.regNumber.trim() || s.mobileNumber.trim();
-      if (hasAnyInput) {
-        if (!s.name.trim() || !s.regNumber.trim()) {
-          setFormError(`Student #${i + 1} is partially filled. Both Name and Registration Number are required if adding this student.`);
+    // Validate Student #3 (Optional: If partially filled, must provide both Name and Reg No and be verified)
+    const s3 = students[2];
+    const hasS3Input = s3.name.trim() || s3.regNumber.trim() || s3.mobileNumber.trim();
+    if (hasS3Input) {
+      if (!s3.name.trim() || !s3.regNumber.trim()) {
+        setFormError(`Student #3 is partially filled. Both Name and Registration Number are required if adding this student.`);
+        return;
+      }
+      if (!s3.isVerified) {
+        const checkRes = await verifyUserInPortal(s3.regNumber.trim());
+        if (checkRes.exists && checkRes.user) {
+          const userMobile = (checkRes.user.mobileNumber || '').replace(/\D/g, '').slice(0, 10);
+          updateStudent(2, {
+            isVerified: true,
+            verifiedUser: checkRes.user,
+            regNumber: checkRes.user.regNumber || s3.regNumber.trim().toUpperCase(),
+            name: s3.name.trim() ? s3.name : checkRes.user.name,
+            mobileNumber: s3.mobileNumber.trim() ? s3.mobileNumber : userMobile,
+            error: undefined
+          });
+        } else {
+          const warnMsg = `⚠️ Warning: Student with Reg. No. "${s3.regNumber.trim().toUpperCase()}" is not registered in the portal. Please register the student first.`;
+          updateStudent(2, { error: warnMsg });
+          setFormError(warnMsg);
           return;
-        }
-        if (!s.isVerified) {
-          const checkRes = await verifyUserInPortal(s.regNumber.trim());
-          if (checkRes.exists && checkRes.user) {
-            const userMobile = (checkRes.user.mobileNumber || '').replace(/\D/g, '').slice(0, 10);
-            updateStudent(i, {
-              isVerified: true,
-              verifiedUser: checkRes.user,
-              regNumber: checkRes.user.regNumber || s.regNumber.trim().toUpperCase(),
-              name: s.name.trim() ? s.name : checkRes.user.name,
-              mobileNumber: s.mobileNumber.trim() ? s.mobileNumber : userMobile,
-              error: undefined
-            });
-          } else {
-            const warnMsg = `⚠️ Warning: Student with Reg. No. "${s.regNumber.trim().toUpperCase()}" is not registered in the portal. Please register the student first.`;
-            updateStudent(i, { error: warnMsg });
-            setFormError(warnMsg);
-            return;
-          }
         }
       }
     }
 
-    // Filter active students: Students #1 & #2, plus any filled optional students
+    // Filter active students: Students #1 & #2, plus Student #3 if filled
     const activeStudents = students.filter(s => s.regNumber.trim() && s.name.trim());
 
     // Check duplicate student reg numbers among active students
@@ -278,7 +367,7 @@ const createInitialStudents = (): StudentFormItem[] => [
       return;
     }
 
-    // 3. Condition: Validate student mobile numbers (strictly 10 digits if entered; at least 1 student mobile is mandatory)
+    // 4. Validate student mobile numbers (strictly 10 digits if entered; at least 1 student mobile is mandatory)
     let validStudentMobileCount = 0;
     for (let i = 0; i < activeStudents.length; i++) {
       const sMobile = activeStudents[i].mobileNumber.trim();
@@ -317,22 +406,33 @@ const createInitialStudents = (): StudentFormItem[] => [
         return item;
       });
 
-      const facultyMember: ProjectFaculty = {
-        name: faculty.name.trim(),
-        employeeId: faculty.employeeId.trim().toUpperCase(),
-        mobileNumber: facMobile
+      const facultyMember1: ProjectFaculty = {
+        name: fac1.name.trim(),
+        employeeId: fac1.employeeId.trim().toUpperCase(),
+        mobileNumber: fac1Mobile
       };
-      if (faculty.uid) {
-        facultyMember.uid = faculty.uid;
+      if (fac1.uid) facultyMember1.uid = fac1.uid;
+      if (fac1.email) facultyMember1.email = fac1.email;
+
+      let facultyMember2: ProjectFaculty | undefined = undefined;
+      if (hasFac2Input && fac2.name.trim() && fac2.employeeId.trim()) {
+        facultyMember2 = {
+          name: fac2.name.trim(),
+          employeeId: fac2.employeeId.trim().toUpperCase(),
+          mobileNumber: fac2.mobileNumber.trim()
+        };
+        if (fac2.uid) facultyMember2.uid = fac2.uid;
+        if (fac2.email) facultyMember2.email = fac2.email;
       }
-      if (faculty.email) {
-        facultyMember.email = faculty.email;
-      }
+
+      const activeFacultiesList = [facultyMember1, facultyMember2].filter(Boolean) as ProjectFaculty[];
 
       const result = await createProjectCodeRecord({
         code: generatedCode,
         codeType,
-        faculty: facultyMember,
+        faculty: facultyMember1,
+        faculty2: facultyMember2,
+        faculties: activeFacultiesList,
         students: studentMembers,
         adminId: profile?.uid || 'admin',
         adminName: profile?.name || 'Administrator'
@@ -360,6 +460,7 @@ const createInitialStudents = (): StudentFormItem[] => [
   const handleClose = () => {
     setCreatedCodeResult(null);
     setFormError('');
+    setFaculties(createInitialFaculties());
     setStudents(createInitialStudents());
     onClose();
   };
@@ -453,15 +554,26 @@ const createInitialStudents = (): StudentFormItem[] => [
 
             {/* Summary details */}
             <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200/80 text-left space-y-3 text-xs">
-              <div className="flex items-start justify-between border-b border-slate-200/60 pb-2.5">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Faculty Guide (1)</span>
-                  <p className="font-bold text-slate-900 text-sm">{createdCodeResult.faculty.name}</p>
-                  <p className="text-slate-500 font-mono">ID: {createdCodeResult.faculty.employeeId} • {createdCodeResult.faculty.mobileNumber}</p>
-                </div>
-                <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-                  Verified
+              <div className="border-b border-slate-200/60 pb-2.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Faculty Guide{createdCodeResult.faculty2 ? 's (2)' : ' (1)'}
                 </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1.5">
+                  {([createdCodeResult.faculty, createdCodeResult.faculty2].filter(Boolean) as ProjectFaculty[]).map((f, idx) => (
+                    <div key={idx} className="bg-white p-2.5 rounded-xl border border-slate-200/60 flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700">Guide #{idx + 1}</span>
+                          <p className="font-bold text-slate-900">{f.name}</p>
+                        </div>
+                        <p className="text-slate-500 font-mono text-[10px] mt-0.5">ID: {f.employeeId} • 📞 {f.mobileNumber}</p>
+                      </div>
+                      <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                        Verified
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -535,7 +647,7 @@ const createInitialStudents = (): StudentFormItem[] => [
               </div>
             )}
 
-            {/* SECTION 1: FACULTY DETAILS (Compulsory 3 fields, Exactly 1 Faculty) */}
+            {/* SECTION 1: FACULTY DETAILS (2 Slots: Faculty #1 Compulsory, Faculty #2 Optional) */}
             <div className="border border-slate-200/90 rounded-2xl p-4 sm:p-5 bg-white shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                 <div className="flex items-center gap-2">
@@ -544,100 +656,125 @@ const createInitialStudents = (): StudentFormItem[] => [
                   </div>
                   <div>
                     <h4 className="text-sm font-extrabold text-slate-900">Faculty Guide Details</h4>
+                    <p className="text-[11px] text-slate-500 font-medium">2 Faculty slots (Guide #1 Compulsory, Guide #2 Optional)</p>
                   </div>
                 </div>
-
-                {facultyVerified ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Verified in Portal
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-semibold text-slate-400">
-                    Verification Required
-                  </span>
-                )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Employee ID with Verification */}
-                <div className="sm:col-span-1">
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Employee ID *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. EMP1045"
-                      value={faculty.employeeId}
-                      onChange={e => {
-                        const val = e.target.value.toUpperCase();
-                        setFaculty(prev => ({ ...prev, employeeId: val }));
-                        setFacultyVerified(false);
-                      }}
-                      onBlur={() => {
-                        if (faculty.employeeId.trim() && !facultyVerified) {
-                          handleVerifyFaculty(faculty.employeeId);
-                        }
-                      }}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono text-slate-900 uppercase focus:bg-white focus:outline-none focus:ring-1 focus:ring-black"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleVerifyFaculty()}
-                      disabled={facultyVerifying || !faculty.employeeId.trim()}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-[10px] font-bold text-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
+              <div className="space-y-3">
+                {faculties.map((f, index) => {
+                  const isCompulsory = index === 0;
+                  return (
+                    <div
+                      key={f.id}
+                      className={`p-3.5 rounded-xl border transition-all space-y-2.5 ${
+                        isCompulsory
+                          ? 'border-slate-200/90 bg-slate-50/60 hover:border-slate-300'
+                          : 'border-slate-200/70 bg-white hover:border-slate-300'
+                      }`}
                     >
-                      {facultyVerifying ? 'Checking...' : 'Verify'}
-                    </button>
-                  </div>
-                </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          Faculty Guide #{index + 1}
+                          {isCompulsory ? (
+                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full">
+                              Compulsory
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                              Optional
+                            </span>
+                          )}
+                          {f.isVerified && (
+                            <span className="text-emerald-600 font-normal inline-flex items-center gap-0.5 text-[10px]">
+                              <CheckCircle2 className="w-3 h-3" /> Verified in Portal
+                            </span>
+                          )}
+                        </span>
+                      </div>
 
-                {/* Faculty Name */}
-                <div className="sm:col-span-1">
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Faculty Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Dr. S. Kumar"
-                    value={faculty.name}
-                    onChange={e => setFaculty(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black"
-                  />
-                </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        {/* Employee ID with Verification */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Employee ID {isCompulsory && '*'}
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              required={isCompulsory}
+                              placeholder={isCompulsory ? "e.g. EMP1045" : "e.g. EMP2089 (Optional)"}
+                              value={f.employeeId}
+                              onChange={e => {
+                                const val = e.target.value.toUpperCase();
+                                updateFaculty(index, { employeeId: val, isVerified: false, error: undefined });
+                              }}
+                              onBlur={() => {
+                                if (f.employeeId.trim() && !f.isVerified) {
+                                  handleVerifyFaculty(index, f.employeeId);
+                                }
+                              }}
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-mono text-slate-900 uppercase focus:outline-none focus:ring-1 focus:ring-black pr-14"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleVerifyFaculty(index)}
+                              disabled={f.verifying || !f.employeeId.trim()}
+                              className="absolute right-1 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-[10px] font-bold text-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
+                            >
+                              {f.verifying ? '...' : 'Verify'}
+                            </button>
+                          </div>
+                        </div>
 
-                {/* Faculty Mobile Number */}
-                <div className="sm:col-span-1">
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Mobile Number (10 Digits) *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    maxLength={10}
-                    placeholder="10-digit mobile"
-                    value={faculty.mobileNumber}
-                    onChange={e => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      setFaculty(prev => ({ ...prev, mobileNumber: val }));
-                    }}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black"
-                  />
-                </div>
+                        {/* Faculty Name */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Faculty Name {isCompulsory && '*'}
+                          </label>
+                          <input
+                            type="text"
+                            required={isCompulsory}
+                            placeholder={isCompulsory ? "Dr. S. Kumar" : "Name (Optional)"}
+                            value={f.name}
+                            onChange={e => updateFaculty(index, { name: e.target.value })}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-black"
+                          />
+                        </div>
+
+                        {/* Faculty Mobile Number */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Mobile Number (10 Digits) {isCompulsory && '*'}
+                          </label>
+                          <input
+                            type="tel"
+                            required={isCompulsory}
+                            maxLength={10}
+                            placeholder={isCompulsory ? "10-digit mobile" : "10-digit mobile (optional)"}
+                            value={f.mobileNumber}
+                            onChange={e => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                              updateFaculty(index, { mobileNumber: val });
+                            }}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-black"
+                          />
+                        </div>
+                      </div>
+
+                      {f.error && (
+                        <div className="bg-amber-50 border border-amber-200 text-amber-900 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs animate-in fade-in duration-200">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>{f.error}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-
-              {facultyError && (
-                <p className="text-[11px] text-red-600 font-medium flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  {facultyError}
-                </p>
-              )}
             </div>
 
-            {/* SECTION 2: STUDENTS DETAILS (5 Students: 2 compulsory, 3 optional) */}
+            {/* SECTION 2: STUDENTS DETAILS (3 Students: 2 compulsory, 1 optional) */}
             <div className="border border-slate-200/90 rounded-2xl p-4 sm:p-5 bg-white shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                 <div className="flex items-center gap-2">
@@ -646,13 +783,14 @@ const createInitialStudents = (): StudentFormItem[] => [
                   </div>
                   <div>
                     <h4 className="text-sm font-extrabold text-slate-900">Student Team Members</h4>
+                    <p className="text-[11px] text-slate-500 font-medium">3 Student slots (Students #1 & #2 Compulsory, Student #3 Optional)</p>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-3">
                 {students.map((student, index) => {
-                  const isCompulsory = index < 2; // Students #1 and #2 compulsory, #3, #4, #5 optional
+                  const isCompulsory = index < 2; // Students #1 and #2 compulsory, #3 optional
                   return (
                     <div 
                       key={student.id} 

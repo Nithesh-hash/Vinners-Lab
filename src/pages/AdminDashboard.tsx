@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, getDocs, doc, writeBatch, where, Timestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Transaction, Component, ProjectCode } from '@/types';
+import type { Transaction, Component, ProjectCode, ProjectFaculty } from '@/types';
 import { 
   Plus, 
   Search, 
@@ -715,20 +715,26 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Faculty Details */}
-                    <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/60 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
-                          <GraduationCap className="w-4 h-4" />
+                    <div className="space-y-1.5">
+                      {([pc.faculty, pc.faculty2].filter(Boolean) as ProjectFaculty[]).map((fac, fIdx) => (
+                        <div key={fIdx} className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/60 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                              <GraduationCap className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                                {pc.faculty2 ? `Faculty Advisor #${fIdx + 1}` : 'Faculty Advisor'}
+                              </span>
+                              <span className="font-bold text-slate-900">{fac.name}</span>
+                            </div>
+                          </div>
+                          <div className="text-right text-[11px] font-mono text-slate-500">
+                            <p>ID: {fac.employeeId}</p>
+                            <p>📞 {fac.mobileNumber}</p>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Faculty Advisor</span>
-                          <span className="font-bold text-slate-900">{pc.faculty.name}</span>
-                        </div>
-                      </div>
-                      <div className="text-right text-[11px] font-mono text-slate-500">
-                        <p>ID: {pc.faculty.employeeId}</p>
-                        <p>📞 {pc.faculty.mobileNumber}</p>
-                      </div>
+                      ))}
                     </div>
 
                     {/* Students List */}
@@ -1083,8 +1089,10 @@ export default function AdminDashboard() {
                 <span className="font-bold font-mono text-slate-900">{teamToDelete.codeType || (teamToDelete.code.startsWith('FSV') ? 'FSV' : 'SSV')}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Faculty Guide:</span>
-                <span className="font-bold text-slate-900">{teamToDelete.faculty.name} ({teamToDelete.faculty.employeeId})</span>
+                <span className="text-slate-500">Faculty Guide{teamToDelete.faculty2 ? 's' : ''}:</span>
+                <span className="font-bold text-slate-900 text-right">
+                  {([teamToDelete.faculty, teamToDelete.faculty2].filter(Boolean) as ProjectFaculty[]).map(f => `${f.name} (${f.employeeId})`).join(' & ')}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Student Team:</span>
