@@ -36,6 +36,7 @@ interface IssueItemRow {
   id: string;
   componentId: string;
   quantity: number;
+  customName?: string;
 }
 
 export default function SearchCodeModal({
@@ -176,6 +177,10 @@ export default function SearchCodeModal({
         setIssueError(`Please select a component for Component Item #${i + 1}.`);
         return;
       }
+      if (row.componentId === '__OTHER__' && !row.customName?.trim()) {
+        setIssueError(`Please manually specify the component name for "Others" in Component Item #${i + 1}.`);
+        return;
+      }
       if (row.quantity < 1) {
         setIssueError(`Quantity for Component Item #${i + 1} must be at least 1.`);
         return;
@@ -187,14 +192,31 @@ export default function SearchCodeModal({
     const requestedQuantities = new Map<string, number>();
 
     for (const row of issueItems) {
-      const comp = inventory.find(i => i.id === row.componentId);
-      if (!comp) {
-        setIssueError('One of the selected components was not found in inventory.');
-        return;
+      if (row.componentId === '__OTHER__') {
+        const customComp: Component = {
+          id: `other_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          name: row.customName!.trim(),
+          category: 'Others / Custom',
+          description: 'Custom specified component',
+          totalQuantity: row.quantity,
+          availableQuantity: row.quantity,
+          issuedQuantity: row.quantity,
+          lowStockThreshold: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isArchived: false
+        };
+        itemsToIssue.push({ component: customComp, quantity: row.quantity });
+      } else {
+        const comp = inventory.find(i => i.id === row.componentId);
+        if (!comp) {
+          setIssueError('One of the selected components was not found in inventory.');
+          return;
+        }
+        const cur = requestedQuantities.get(comp.id) || 0;
+        requestedQuantities.set(comp.id, cur + row.quantity);
+        itemsToIssue.push({ component: comp, quantity: row.quantity });
       }
-      const cur = requestedQuantities.get(comp.id) || 0;
-      requestedQuantities.set(comp.id, cur + row.quantity);
-      itemsToIssue.push({ component: comp, quantity: row.quantity });
     }
 
     for (const [compId, totalQty] of requestedQuantities.entries()) {
@@ -531,7 +553,7 @@ export default function SearchCodeModal({
                               required
                               value={item.componentId}
                               onChange={e => {
-                                updateIssueItemRow(index, { componentId: e.target.value, quantity: 1 });
+                                updateIssueItemRow(index, { componentId: e.target.value, quantity: 1, customName: '' });
                               }}
                               className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-black"
                             >
@@ -545,7 +567,25 @@ export default function SearchCodeModal({
                                   {comp.name} ({comp.availableQuantity} available) - {comp.category}
                                 </option>
                               ))}
+                              <option value="__OTHER__">✨ Others (Type manually)</option>
                             </select>
+
+                            {/* Custom name input when 'Others' is selected */}
+                            {item.componentId === '__OTHER__' && (
+                              <div className="mt-2.5 animate-in fade-in duration-200">
+                                <label className="block text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-1">
+                                  Specify Component Name (Others) *
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="Type component name manually (e.g. ESP32-CAM, Custom Sensor, 12V Adapter)..."
+                                  value={item.customName || ''}
+                                  onChange={e => updateIssueItemRow(index, { customName: e.target.value })}
+                                  className="w-full px-3.5 py-2 rounded-xl border-2 border-emerald-400 bg-emerald-50/40 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-400 shadow-2xs"
+                                />
+                              </div>
+                            )}
                           </div>
 
                           {/* Quantity to Issue */}
@@ -631,7 +671,7 @@ export default function SearchCodeModal({
                 <div className="pt-2 flex justify-end">
                   <button
                     type="submit"
-                    disabled={isIssuing || !selectedStudent || issueItems.some(i => !i.componentId)}
+                    disabled={isIssuing || !selectedStudent || issueItems.some(i => !i.componentId || (i.componentId === '__OTHER__' && !i.customName?.trim()))}
                     className="w-full sm:w-auto px-6 py-3 rounded-full bg-slate-900 hover:bg-black text-white text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     {isIssuing ? (

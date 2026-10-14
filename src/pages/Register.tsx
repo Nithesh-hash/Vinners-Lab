@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { GraduationCap, Briefcase } from 'lucide-react';
+import { GraduationCap, Briefcase, CheckCircle2, Copy, Check, ArrowRight, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getNextStudentCode, getAcademicYear } from '@/lib/projectCodeService';
 
 export default function Register() {
   const [accountType, setAccountType] = useState<'student' | 'faculty'>('student');
@@ -16,6 +17,8 @@ export default function Register() {
     password: '',
     confirmPassword: ''
   });
+  const [createdStudentCode, setCreatedStudentCode] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -41,33 +44,48 @@ export default function Register() {
     }
 
     const cleanPhone = formData.mobileNumber.trim();
-    if (accountType === 'faculty') {
-      if (!cleanPhone || cleanPhone.length !== 10 || !/^\d{10}$/.test(cleanPhone)) {
-        return setError('Faculty mobile number is compulsory and must be exactly 10 digits.');
+    if (!cleanPhone || cleanPhone.length !== 10 || !/^\d{10}$/.test(cleanPhone)) {
+      return setError(accountType === 'faculty' 
+        ? 'Faculty mobile number is compulsory and must be exactly 10 digits.' 
+        : 'Student mobile number is compulsory and must be exactly 10 digits.');
+    }
+
+    const cleanEmail = formData.email.trim().toLowerCase();
+    if (accountType === 'student') {
+      if (!cleanEmail.endsWith('@vitstudent.ac.in')) {
+        return setError('Student email ID must end only at @vitstudent.ac.in');
       }
-    } else if (cleanPhone && (cleanPhone.length !== 10 || !/^\d{10}$/.test(cleanPhone))) {
-      return setError('Student mobile number must be exactly 10 digits (or leave blank).');
     }
 
     setLoading(true);
 
     try {
       // Create auth user
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, formData.password);
       const user = userCredential.user;
+
+      // Generate unique student code for student accounts e.g. IIC2026-27-0001
+      const studentCode = accountType === 'student' ? await getNextStudentCode() : null;
+      const acadYear = getAcademicYear();
 
       // Create profile in Firestore
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
-        name: formData.name,
-        email: formData.email,
+        name: formData.name.trim(),
+        email: cleanEmail,
         regNumber: formData.regNumber.trim().toUpperCase(),
-        mobileNumber: formData.mobileNumber.trim(),
+        mobileNumber: cleanPhone,
         role: accountType,
+        studentCode: studentCode,
+        academicYear: acadYear,
         createdAt: new Date()
       });
 
-      navigate('/dashboard');
+      if (studentCode) {
+        setCreatedStudentCode(studentCode);
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Failed to create an account');
@@ -75,6 +93,77 @@ export default function Register() {
       setLoading(false);
     }
   };
+
+  if (createdStudentCode) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-3 sm:p-4 font-sans">
+        <div className="w-full max-w-[480px] bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 sm:p-8 md:p-9 border border-slate-200/90 text-center space-y-5 animate-in zoom-in-95 duration-300">
+          <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
+            <CheckCircle2 className="w-8 h-8" />
+          </div>
+
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+              Registration Successful
+            </span>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-3">
+              Welcome, {formData.name}!
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Your official laboratory member identification code has been generated.
+            </p>
+          </div>
+
+          {/* CODE DISPLAY BOX */}
+          <div className="p-5 rounded-2xl bg-slate-900 text-white space-y-3 shadow-lg">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">
+              Your Unique Student Code
+            </span>
+            <div className="flex items-center justify-center gap-2">
+              <span className="font-mono text-2xl sm:text-3xl font-black tracking-widest text-emerald-400">
+                {createdStudentCode}
+              </span>
+            </div>
+            <div className="flex items-center justify-center gap-2 pt-1 text-slate-300 text-xs">
+              <span className="font-mono text-[11px] bg-slate-800 px-2 py-0.5 rounded">AY {getAcademicYear()}</span>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(createdStudentCode);
+                  setCopiedCode(true);
+                  setTimeout(() => setCopiedCode(false), 2000);
+                }}
+                className="px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-emerald-500/30"
+              >
+                {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedCode ? 'Copied!' : 'Copy Code'}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-left text-xs text-slate-600 space-y-1">
+            <p className="font-bold text-slate-900 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              Keep this code safe
+            </p>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Lab admins will use this unique code along with your registration number ({formData.regNumber.toUpperCase()}) to issue authorized hardware components directly to you.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
+          >
+            <span>Proceed to Student Dashboard</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-3 sm:p-4 font-sans">
@@ -155,12 +244,12 @@ export default function Register() {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Mobile Number {accountType === 'faculty' ? '(Compulsory - 10 Digits)' : '(Optional - 10 Digits)'}
+              Mobile Number (Compulsory - 10 Digits)
             </label>
             <input 
               type="tel" 
               name="mobileNumber"
-              required={accountType === 'faculty'}
+              required
               maxLength={10}
               value={formData.mobileNumber}
               onChange={(e) => {
@@ -173,7 +262,9 @@ export default function Register() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Email address</label>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Email address {accountType === 'student' ? '(@vitstudent.ac.in only)' : '(@vit.ac.in)'}
+            </label>
             <input 
               type="email" 
               name="email"
@@ -181,7 +272,7 @@ export default function Register() {
               value={formData.email}
               onChange={handleChange}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-black focus:border-black text-xs sm:text-sm transition-all placeholder:text-slate-400" 
-              placeholder="name@vit.ac.in" 
+              placeholder={accountType === 'faculty' ? 'name@vit.ac.in' : 'name@vitstudent.ac.in'} 
             />
           </div>
 

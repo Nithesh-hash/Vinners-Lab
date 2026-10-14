@@ -47,6 +47,7 @@ export interface Transaction {
   returnsLog?: ReturnLogEntry[];
   status: 'Checked Out' | 'Partially Returned' | 'Returned' | 'Overdue';
   projectPurpose?: string;
+  studentCode?: string; // e.g. "IIC2026-27-0001"
   // Project Code Linkage
   projectCode?: string; // e.g. "SSV2026-27-0001"
   facultyEmployeeId?: string;
@@ -69,6 +70,7 @@ export interface ProjectFaculty {
 export interface ProjectMember {
   name: string;
   regNumber: string;
+  studentCode?: string; // e.g. "IIC2026-27-0001"
   mobileNumber?: string;
   email?: string;
   uid?: string;

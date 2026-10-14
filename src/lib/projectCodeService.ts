@@ -1,6 +1,6 @@
 import { collection, query, where, getDocs, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import type { ProjectCode, ProjectMember, ProjectFaculty, Component, NotificationItem, ProjectIssuedItem } from '@/types';
+import type { ProjectCode, ProjectMember, ProjectFaculty, Component, NotificationItem, ProjectIssuedItem, Transaction } from '@/types';
 
 /**
  * Returns current academic year format, e.g. "2026-27"
@@ -51,6 +51,44 @@ export async function getNextProjectCode(codeType: 'SSV' | 'FSV' = 'SSV'): Promi
     return `${prefix}${String(nextNum).padStart(4, '0')}`;
   } catch (error) {
     console.warn("Could not query codes for sequence:", error);
+    return `${prefix}0001`;
+  }
+}
+
+/**
+ * Computes next sequential student member unique code based on academic year.
+ * e.g. "IIC2026-27-0001" where "2026-27" is academic year and "0001" is 4-digit sequential ID.
+ * Increments sequentially for every registered student member.
+ */
+export async function getNextStudentCode(): Promise<string> {
+  const acadYear = getAcademicYear();
+  const prefix = `IIC${acadYear}-`;
+
+  try {
+    const q = query(
+      collection(db, 'users'),
+      where('role', '==', 'student')
+    );
+    const snap = await getDocs(q);
+
+    let maxNum = 0;
+    snap.docs.forEach(d => {
+      const data = d.data();
+      const code = (data.studentCode || data.iicCode || '') as string;
+      if (code && code.startsWith(prefix)) {
+        const parts = code.split('-');
+        const lastPart = parts[parts.length - 1];
+        const num = parseInt(lastPart, 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    });
+
+    const nextNum = maxNum + 1;
+    return `${prefix}${String(nextNum).padStart(4, '0')}`;
+  } catch (error) {
+    console.warn("Could not query student codes for sequence:", error);
     return `${prefix}0001`;
   }
 }
@@ -483,6 +521,7 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
   }
 
   for (const item of items) {
+    if (item.component.id.startsWith('other_')) continue;
     const totalRequested = qtyMap.get(item.component.id) || 0;
     if (item.component.availableQuantity < totalRequested) {
       throw new Error(`Insufficient stock for "${item.component.name}". Requested ${totalRequested}, but only ${item.component.availableQuantity} unit(s) available.`);
@@ -553,6 +592,7 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
   // 3. Update inventory for each component
   const updatedComps = new Set<string>();
   for (const item of items) {
+    if (item.component.id.startsWith('other_')) continue;
     if (!updatedComps.has(item.component.id)) {
       updatedComps.add(item.component.id);
       const totalToDeduct = qtyMap.get(item.component.id) || item.quantity;
@@ -723,4 +763,125 @@ export async function checkAndAutoSendDueDateNotifications(): Promise<number> {
     console.warn("Auto notification check note:", error);
     return 0;
   }
+}
+
+/**
+ * Issues multiple hardware components directly to a student (who is not part of SSV or FSV) in one atomic batch.
+ * Reflects in the student's personal portal in real-time.
+ */
+export async function issueMultipleComponentsToStudent(params: {
+  student: {
+    uid?: string;
+    name: string;
+    regNumber: string;
+    email?: string;
+    mobileNumber?: string;
+    studentCode?: string;
+  };
+  items: Array<{
+    component: Component;
+    quantity: number;
+  }>;
+  dueDate: Date;
+  adminId: string;
+  adminName: string;
+  notes?: string;
+}): Promise<string[]> {
+  const { student, items, dueDate, adminId, adminName, notes } = params;
+
+  if (items.length === 0) {
+    throw new Error('At least one component must be selected.');
+  }
+
+  // 1. Verify stock across items (grouping duplicates if any)
+  const qtyMap = new Map<string, number>();
+  for (const item of items) {
+    const cur = qtyMap.get(item.component.id) || 0;
+    qtyMap.set(item.component.id, cur + item.quantity);
+  }
+
+  for (const item of items) {
+    if (item.component.id.startsWith('other_')) continue;
+    const totalRequested = qtyMap.get(item.component.id) || 0;
+    if (item.component.availableQuantity < totalRequested) {
+      throw new Error(`Insufficient stock for "${item.component.name}". Requested ${totalRequested}, but only ${item.component.availableQuantity} unit(s) available.`);
+    }
+  }
+
+  const batch = writeBatch(db);
+  const dueTimestamp = Timestamp.fromDate(dueDate);
+  const txIds: string[] = [];
+  const cleanCollectorReg = student.regNumber.trim().toUpperCase();
+
+  // 2. Create transactions for each component
+  for (const item of items) {
+    const txRef = doc(collection(db, 'transactions'));
+    txIds.push(txRef.id);
+
+    const transactionData: Partial<Transaction> = {
+      id: txRef.id,
+      componentId: item.component.id,
+      componentName: item.component.name,
+      studentId: student.uid || '',
+      studentName: student.name.trim(),
+      studentRegNumber: cleanCollectorReg,
+      studentEmail: (student.email || '').trim().toLowerCase(),
+      studentCode: student.studentCode || undefined,
+      quantity: item.quantity,
+      returnedQuantity: 0,
+      expectedReturnDate: dueTimestamp,
+      issueDate: Timestamp.now(),
+      status: 'Checked Out',
+      issuedByAdminId: adminId,
+      issuedByAdminName: adminName,
+      adminNotes: notes || '',
+      projectPurpose: notes || 'Direct Student Issue (Individual / Non-SSV/FSV)',
+      collectedByStudentName: student.name.trim(),
+      collectedByStudentRegNumber: cleanCollectorReg
+    };
+
+    batch.set(txRef, cleanForFirestore(transactionData));
+  }
+
+  // 3. Update inventory for each component
+  const updatedComps = new Set<string>();
+  for (const item of items) {
+    if (item.component.id.startsWith('other_')) continue;
+    if (!updatedComps.has(item.component.id)) {
+      updatedComps.add(item.component.id);
+      const totalToDeduct = qtyMap.get(item.component.id) || item.quantity;
+      const compRef = doc(db, 'inventory', item.component.id);
+      batch.update(compRef, cleanForFirestore({
+        availableQuantity: item.component.availableQuantity - totalToDeduct,
+        issuedQuantity: (item.component.issuedQuantity || 0) + totalToDeduct,
+        updatedAt: Timestamp.now()
+      }));
+    }
+  }
+
+  // 4. Send Consolidated Notification to the student
+  const formattedDueDate = dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const itemsSummary = items.map(i => `${i.quantity}x ${i.component.name}`).join(', ');
+
+  const notifRef = doc(collection(db, 'notifications'));
+  const notif: NotificationItem = {
+    id: notifRef.id,
+    targetRegNumber: cleanCollectorReg,
+    roleTarget: 'student',
+    title: `Hardware Issued (${items.length} item${items.length > 1 ? 's' : ''})`,
+    message: `${itemsSummary} issued directly to you. Due date: ${formattedDueDate}.`,
+    type: 'component_issued',
+    componentName: items.length === 1 ? items[0].component.name : `${items.length} components`,
+    dueDate: dueTimestamp,
+    isRead: false,
+    createdAt: Timestamp.now(),
+    urgency: 'info'
+  };
+  if (student.uid) {
+    notif.userId = student.uid;
+  }
+  batch.set(notifRef, cleanForFirestore(notif));
+
+  await batch.commit();
+  return txIds;
 }

@@ -205,11 +205,18 @@ export default function ReturnLoan() {
           throw new Error(`Cannot return ${returnQty} units. Only ${currentOutstanding} units remain outstanding.`);
         }
 
-        const compRef = doc(db, 'inventory', currentTx.componentId);
-        const compDoc = await txn.get(compRef);
+        // Check if real inventory component or custom / other item
+        let isRealComp = false;
+        let currentComp: Component | null = null;
+        let compRef: any = null;
 
-        if (!compDoc.exists()) {
-          throw new Error('Inventory component record was not found.');
+        if (currentTx.componentId && !currentTx.componentId.startsWith('other_')) {
+          compRef = doc(db, 'inventory', currentTx.componentId);
+          const compDoc = await txn.get(compRef);
+          if (compDoc.exists()) {
+            isRealComp = true;
+            currentComp = compDoc.data() as Component;
+          }
         }
 
         // Project Code read (must precede writes)
@@ -220,33 +227,33 @@ export default function ReturnLoan() {
           codeDoc = await txn.get(codeRef);
         }
 
-        const currentComp = compDoc.data() as Component;
-
         const newReturnedTotal = currentReturned + returnQty;
         finalStatus = newReturnedTotal >= currentTx.quantity ? 'Returned' : 'Partially Returned';
 
-        // Inventory Stock Updates
-        const newIssuedQty = Math.max(0, currentComp.issuedQuantity - returnQty);
-        let updatedAvailable = currentComp.availableQuantity;
-        let updatedDamaged = currentComp.damagedQuantity || 0;
+        // Inventory Stock Updates (only for real inventory items)
+        if (isRealComp && currentComp && compRef) {
+          const newIssuedQty = Math.max(0, currentComp.issuedQuantity - returnQty);
+          let updatedAvailable = currentComp.availableQuantity;
+          let updatedDamaged = currentComp.damagedQuantity || 0;
 
-        if (condition === 'Good') {
-          // Usable items re-enter available stock
-          updatedAvailable = currentComp.availableQuantity + returnQty;
-        } else {
-          // Damaged or Incomplete items are segregated and NOT made available
-          updatedDamaged = (currentComp.damagedQuantity || 0) + returnQty;
+          if (condition === 'Good') {
+            // Usable items re-enter available stock
+            updatedAvailable = currentComp.availableQuantity + returnQty;
+          } else {
+            // Damaged or Incomplete items are segregated and NOT made available
+            updatedDamaged = (currentComp.damagedQuantity || 0) + returnQty;
+          }
+
+          newAvailableStock = updatedAvailable;
+
+          // Atomically update inventory component
+          txn.update(compRef, {
+            availableQuantity: updatedAvailable,
+            issuedQuantity: newIssuedQty,
+            damagedQuantity: updatedDamaged,
+            updatedAt: serverTimestamp()
+          });
         }
-
-        newAvailableStock = updatedAvailable;
-
-        // Atomically update inventory component
-        txn.update(compRef, {
-          availableQuantity: updatedAvailable,
-          issuedQuantity: newIssuedQty,
-          damagedQuantity: updatedDamaged,
-          updatedAt: serverTimestamp()
-        });
 
         // Prepare return log record
         const cleanNotes = adminNotes.trim();

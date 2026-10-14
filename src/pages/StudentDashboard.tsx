@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Transaction, Component, ProjectCode } from '@/types';
 import { 
@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import ReturnQRModal from '@/components/ReturnQRModal';
 import NotificationsModal from '@/components/NotificationsModal';
-import { getDueDateStatus, checkAndAutoSendDueDateNotifications } from '@/lib/projectCodeService';
+import { getDueDateStatus, checkAndAutoSendDueDateNotifications, getNextStudentCode, getAcademicYear } from '@/lib/projectCodeService';
 
 export default function StudentDashboard() {
   const [searchParams] = useSearchParams();
@@ -220,6 +220,22 @@ export default function StudentDashboard() {
     };
   }, [user, profile, userReg, isFaculty]);
 
+  // Auto-generate unique student code for existing students if not yet assigned
+  useEffect(() => {
+    if (user && profile && profile.role === 'student' && !profile.studentCode) {
+      getNextStudentCode().then(async (newCode) => {
+        try {
+          await updateDoc(doc(db, 'users', user.uid), {
+            studentCode: newCode,
+            academicYear: getAcademicYear()
+          });
+        } catch (e) {
+          console.warn("Could not auto-backfill student code:", e);
+        }
+      });
+    }
+  }, [user, profile]);
+
   const activeTransactions = transactions.filter(t => {
     const outstanding = t.quantity - (t.returnedQuantity || 0);
     return t.status !== 'Returned' && outstanding > 0;
@@ -274,11 +290,27 @@ export default function StudentDashboard() {
       {/* TOP HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          {profile?.regNumber && (
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              {profile.regNumber} • {isFaculty ? 'Faculty Advisor' : 'Student'}
-            </p>
-          )}
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+            {profile?.regNumber && (
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider font-mono">
+                {profile.regNumber} • {isFaculty ? 'Faculty Advisor' : 'Student'}
+              </span>
+            )}
+            {!isFaculty && profile?.studentCode && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/90 text-emerald-800 text-xs font-bold font-mono shadow-2xs">
+                <span>Unique Student Code:</span>
+                <span className="text-emerald-950 font-black tracking-wide">{profile.studentCode}</span>
+                <button
+                  type="button"
+                  onClick={() => handleCopyCode(profile.studentCode!)}
+                  className="hover:text-emerald-950 transition-colors cursor-pointer p-0.5"
+                  title="Copy Unique Code"
+                >
+                  {copiedCodeId === profile.studentCode ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                </button>
+              </div>
+            )}
+          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             Welcome back, {profile?.name || (isFaculty ? 'Faculty' : 'Student')}
           </h1>
@@ -574,8 +606,8 @@ export default function StudentDashboard() {
                                     <strong>{tx.projectCode}</strong>
                                   </span>
                                 ) : (
-                                  <span className="font-mono text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-0.5">
-                                    Personal Checkout
+                                  <span className="font-mono text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md inline-flex items-center gap-1 mt-1">
+                                    Direct Student Issue
                                   </span>
                                 )}
                               </td>
@@ -669,8 +701,8 @@ export default function StudentDashboard() {
                                   Code: {tx.projectCode}
                                 </span>
                               ) : (
-                                <span className="font-mono text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded mt-1 inline-block">
-                                  Personal Loan
+                                <span className="font-mono text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded mt-1 inline-block">
+                                  Direct Student Issue
                                 </span>
                               )}
                             </div>

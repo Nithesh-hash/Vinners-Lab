@@ -19,11 +19,13 @@ import {
   QrCode,
   Users,
   GraduationCap,
-  Trash2
+  Trash2,
+  UserCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import GenerateCodeModal from '@/components/GenerateCodeModal';
 import SearchCodeModal from '@/components/SearchCodeModal';
+import IssueToStudentModal from '@/components/IssueToStudentModal';
 import NotificationsModal from '@/components/NotificationsModal';
 import { getDueDateStatus, checkAndAutoSendDueDateNotifications, deleteProjectCodeRecord } from '@/lib/projectCodeService';
 
@@ -63,6 +65,7 @@ export default function AdminDashboard() {
   // Project Code & Search Modals
   const [showGenerateCodeModal, setShowGenerateCodeModal] = useState(false);
   const [showSearchCodeModal, setShowSearchCodeModal] = useState(false);
+  const [showIssueToStudentModal, setShowIssueToStudentModal] = useState(false);
   const [searchModalInitialCode, setSearchModalInitialCode] = useState('');
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
 
@@ -346,6 +349,16 @@ export default function AdminDashboard() {
             >
               <Search className="w-4 h-4 text-indigo-600" />
               Search Code
+            </button>
+
+            <button 
+              onClick={() => {
+                setShowIssueToStudentModal(true);
+              }}
+              className="px-4 sm:px-5 py-2.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-200/90 text-xs sm:text-sm font-bold shadow-2xs transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+            >
+              <UserCheck className="w-4 h-4 text-emerald-600" />
+              Issue to Student
             </button>
           </div>
         </div>
@@ -800,8 +813,13 @@ export default function AdminDashboard() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h3 className="text-base font-bold text-slate-900">{tx.componentName}</h3>
-                          <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                            Student: <strong className="text-slate-800">{tx.studentName}</strong> ({tx.studentRegNumber})
+                          <p className="text-xs text-slate-500 mt-0.5 font-medium flex items-center flex-wrap gap-1">
+                            <span>Student: <strong className="text-slate-800">{tx.studentName}</strong> ({tx.studentRegNumber})</span>
+                            {tx.studentCode && (
+                              <span className="font-mono text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                {tx.studentCode}
+                              </span>
+                            )}
                           </p>
                         </div>
                         <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
@@ -1023,6 +1041,17 @@ export default function AdminDashboard() {
         onClose={() => setShowSearchCodeModal(false)}
         inventory={inventory}
         initialCode={searchModalInitialCode}
+        onComponentIssued={() => {
+          // Handled via Firestore onSnapshot
+        }}
+      />
+
+      {/* MODAL 5B: ISSUE HARDWARE DIRECTLY TO STUDENT (NON-SSV/FSV) */}
+      <IssueToStudentModal
+        isOpen={showIssueToStudentModal}
+        onClose={() => setShowIssueToStudentModal(false)}
+        inventory={inventory}
+        transactions={transactions}
         onComponentIssued={() => {
           // Handled via Firestore onSnapshot
         }}

@@ -10,6 +10,8 @@ export interface UserProfile {
   regNumber?: string;
   mobileNumber?: string;
   role: 'student' | 'faculty' | 'admin';
+  studentCode?: string; // e.g. "IIC2026-27-0001"
+  academicYear?: string;
 }
 
 interface AuthContextType {
