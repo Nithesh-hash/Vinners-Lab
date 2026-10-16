@@ -1,5 +1,6 @@
 export interface Component {
   id: string;
+  code?: string; // Laboratory component code, e.g. "IIC-C1" where C is component
   name: string;
   category: string;
   description: string;
@@ -28,11 +29,13 @@ export interface ReturnLogEntry {
 export interface Transaction {
   id: string;
   componentId: string;
+  componentCode?: string; // e.g. "IIC-C1"
   componentName: string;
   studentId: string;
   studentName: string;
   studentRegNumber: string;
   studentEmail?: string;
+  studentMobile?: string;
   quantity: number;
   returnedQuantity?: number; // Accumulated returned units
   expectedReturnDate: any; // Firestore timestamp

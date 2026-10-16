@@ -51,8 +51,9 @@ export default function Landing() {
           <img src="/logo.png" alt="Vinner Lab Logo" className="w-10 h-10 rounded-lg shadow-sm" />
           <span className="text-2xl font-bold text-slate-900 tracking-tight">Vinner Lab</span>
         </div>
-        <div className="flex items-center gap-3 sm:gap-4">
-          <Link to="/login" className="px-4 py-2 text-slate-700 font-medium hover:text-brand-600 transition-colors text-sm sm:text-base">Log In</Link>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Link to="/explore" className="px-3 sm:px-4 py-2 text-slate-700 font-medium hover:text-brand-600 transition-colors text-sm sm:text-base">Explore</Link>
+          <Link to="/login" className="px-3 sm:px-4 py-2 text-slate-700 font-medium hover:text-brand-600 transition-colors text-sm sm:text-base">Log In</Link>
           <Link to="/register" className="hidden sm:inline-flex items-center px-5 py-2 rounded-full bg-white/60 hover:bg-white/80 text-slate-700 font-medium text-sm border border-slate-300/60 shadow-xs backdrop-blur-md transition-all">Register</Link>
         </div>
       </header>
@@ -66,6 +67,15 @@ export default function Landing() {
 
           {/* Frosted Glass Pill Capsule Buttons Stacked Vertically */}
           <div className="flex flex-col items-center justify-center gap-3.5 sm:gap-4 w-full">
+            <Link 
+              to="/explore" 
+              className="group relative w-full max-w-[280px] sm:max-w-[320px] py-3.5 px-6 sm:px-8 rounded-full bg-white/50 hover:bg-white/75 active:bg-white/90 backdrop-blur-xl border border-slate-300/70 ring-1 ring-white/70 shadow-[0_4px_20px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.07),inset_0_1px_2px_rgba(255,255,255,0.95)] flex items-center justify-center transition-all duration-200 cursor-pointer active:scale-[0.98]"
+            >
+              <span className="text-base sm:text-lg font-medium text-slate-700 group-hover:text-slate-900 tracking-tight transition-colors text-center">
+                Explore Components
+              </span>
+            </Link>
+
             <Link 
               to="/login?type=student" 
               className="group relative w-full max-w-[280px] sm:max-w-[320px] py-3.5 px-6 sm:px-8 rounded-full bg-white/50 hover:bg-white/75 active:bg-white/90 backdrop-blur-xl border border-slate-300/70 ring-1 ring-white/70 shadow-[0_4px_20px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.07),inset_0_1px_2px_rgba(255,255,255,0.95)] flex items-center justify-center transition-all duration-200 cursor-pointer active:scale-[0.98]"

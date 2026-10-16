@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { doc, getDoc, runTransaction, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, serverTimestamp, Timestamp, query, collection, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Transaction, Component, ReturnLogEntry } from '@/types';
+import { notifyAdminOnReturn } from '@/lib/emailService';
 import {
   CheckCircle2,
   AlertCircle,
@@ -26,6 +27,8 @@ export default function ReturnLoan() {
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [component, setComponent] = useState<Component | null>(null);
   const [studentEmail, setStudentEmail] = useState<string>('');
+  const [studentMobile, setStudentMobile] = useState<string>('');
+  const [studentCode, setStudentCode] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Return Form State
@@ -84,15 +87,41 @@ export default function ReturnLoan() {
           }
         }
 
-        // 3. Fetch student email if not on transaction
-        if (txData.studentEmail) {
-          if (isMounted) setStudentEmail(txData.studentEmail);
-        } else if (txData.studentId) {
-          const userDocRef = doc(db, 'users', txData.studentId);
-          const userSnap = await getDoc(userDocRef);
-          if (userSnap.exists() && isMounted) {
-            setStudentEmail(userSnap.data().email || 'N/A');
+        // 3. Fetch supplementary student details if not fully present on transaction
+        let sEmail = txData.studentEmail || '';
+        let sMobile = txData.studentMobile || '';
+        let sCode = txData.studentCode || '';
+
+        if (!sEmail || !sMobile || !sCode) {
+          try {
+            if (txData.studentId) {
+              const userDocRef = doc(db, 'users', txData.studentId);
+              const userSnap = await getDoc(userDocRef);
+              if (userSnap.exists()) {
+                const u = userSnap.data();
+                if (!sEmail) sEmail = u.email || '';
+                if (!sMobile) sMobile = u.mobileNumber || '';
+                if (!sCode) sCode = u.studentCode || '';
+              }
+            } else if (txData.studentRegNumber) {
+              const qUser = query(collection(db, 'users'), where('regNumber', '==', txData.studentRegNumber.trim().toUpperCase()));
+              const uSnap = await getDocs(qUser);
+              if (!uSnap.empty) {
+                const u = uSnap.docs[0].data();
+                if (!sEmail) sEmail = u.email || '';
+                if (!sMobile) sMobile = u.mobileNumber || '';
+                if (!sCode) sCode = u.studentCode || '';
+              }
+            }
+          } catch (e) {
+            console.warn("Could not fetch supplementary student details:", e);
           }
+        }
+
+        if (isMounted) {
+          setStudentEmail(sEmail || 'N/A');
+          setStudentMobile(sMobile || '');
+          setStudentCode(sCode || '');
         }
 
         if (isMounted) setLoading(false);
@@ -233,8 +262,8 @@ export default function ReturnLoan() {
         // Inventory Stock Updates (only for real inventory items)
         if (isRealComp && currentComp && compRef) {
           const newIssuedQty = Math.max(0, currentComp.issuedQuantity - returnQty);
-          let updatedAvailable = currentComp.availableQuantity;
           let updatedDamaged = currentComp.damagedQuantity || 0;
+          let updatedAvailable = currentComp.availableQuantity;
 
           if (condition === 'Good') {
             // Usable items re-enter available stock
@@ -243,6 +272,10 @@ export default function ReturnLoan() {
             // Damaged or Incomplete items are segregated and NOT made available
             updatedDamaged = (currentComp.damagedQuantity || 0) + returnQty;
           }
+
+          // Strict Invariant: Available stock can never exceed totalQuantity or total - issued - damaged
+          const maxAllowedStock = Math.max(0, currentComp.totalQuantity - newIssuedQty - updatedDamaged);
+          updatedAvailable = Math.max(0, Math.min(maxAllowedStock, Math.min(currentComp.totalQuantity, updatedAvailable)));
 
           newAvailableStock = updatedAvailable;
 
@@ -338,6 +371,29 @@ export default function ReturnLoan() {
             issuedQuantity: Math.max(0, prev.issuedQuantity - returnQty)
           };
         });
+      }
+
+      // Automated email notification to admin upon return verification with complete student details
+      if (transaction) {
+        notifyAdminOnReturn({
+          studentName: transaction.studentName,
+          studentRegNumber: transaction.studentRegNumber,
+          studentEmail: studentEmail !== 'N/A' ? studentEmail : transaction.studentEmail,
+          studentMobile: studentMobile || transaction.studentMobile,
+          studentCode: studentCode || transaction.studentCode,
+          projectCode: transaction.projectCode,
+          facultyName: transaction.facultyName,
+          componentCode: component?.code || transaction.componentCode,
+          componentName: transaction.componentName,
+          category: component?.category,
+          returnedQuantity: returnQty,
+          returnDate: new Date(),
+          condition,
+          adminNotes: adminNotes.trim() || undefined,
+          adminName: profile?.name || 'Lab Admin',
+          remainingQuantity: Math.max(0, transaction.quantity - ((transaction.returnedQuantity || 0) + returnQty)),
+          transactionId: transaction.id
+        }).catch(err => console.warn("Return email error:", err));
       }
 
       setReturnSuccess(true);

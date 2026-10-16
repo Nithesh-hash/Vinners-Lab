@@ -1,6 +1,7 @@
 import { collection, query, where, getDocs, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import type { ProjectCode, ProjectMember, ProjectFaculty, Component, NotificationItem, ProjectIssuedItem, Transaction } from '@/types';
+import { notifyAdminOnIssue } from './emailService';
 
 /**
  * Returns current academic year format, e.g. "2026-27"
@@ -413,11 +414,14 @@ export async function issueComponentUnderProjectCode(params: {
   const transactionData = {
     id: txRef.id,
     componentId: component.id,
+    componentCode: component.code || '',
     componentName: component.name,
     studentId: selectedStudent.uid || '',
     studentName: selectedStudent.name.trim(),
     studentRegNumber: cleanCollectorReg,
     studentEmail: (selectedStudent.email || '').trim().toLowerCase(),
+    studentMobile: selectedStudent.mobileNumber || '',
+    studentCode: selectedStudent.studentCode || '',
     quantity,
     returnedQuantity: 0,
     expectedReturnDate: dueTimestamp,
@@ -533,6 +537,32 @@ export async function issueComponentUnderProjectCode(params: {
   });
 
   await batch.commit();
+
+  // Send automated email notification to admin upon issuance with complete student details
+  try {
+    notifyAdminOnIssue({
+      studentName: selectedStudent.name.trim(),
+      studentRegNumber: cleanCollectorReg,
+      studentEmail: selectedStudent.email,
+      studentMobile: selectedStudent.mobileNumber,
+      studentCode: selectedStudent.studentCode,
+      projectCode: projectCode.code,
+      facultyName: projectCode.faculty?.name,
+      facultyMobile: projectCode.faculty?.mobileNumber,
+      componentCode: component.code,
+      componentName: component.name,
+      category: component.category,
+      quantity,
+      issueDate: new Date(),
+      dueDate,
+      adminName: adminName || 'Lab Admin',
+      projectPurpose: notes || `Project Code: ${projectCode.code}`,
+      transactionId: txRef.id
+    }).catch(e => console.warn("Issue email error:", e));
+  } catch (err) {
+    console.warn("Could not dispatch issue email alert:", err);
+  }
+
   return txRef.id;
 }
 
@@ -593,11 +623,14 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
     const transactionData = {
       id: txRef.id,
       componentId: item.component.id,
+      componentCode: item.component.code || '',
       componentName: item.component.name,
       studentId: selectedStudent.uid || '',
       studentName: selectedStudent.name.trim(),
       studentRegNumber: cleanCollectorReg,
       studentEmail: (selectedStudent.email || '').trim().toLowerCase(),
+      studentMobile: selectedStudent.mobileNumber || '',
+      studentCode: selectedStudent.studentCode || '',
       quantity: item.quantity,
       returnedQuantity: 0,
       expectedReturnDate: dueTimestamp,
@@ -717,6 +750,36 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
   });
 
   await batch.commit();
+
+  // 6. Send automated email alerts to admin with complete student credentials
+  try {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const txId = txIds[i];
+      notifyAdminOnIssue({
+        studentName: selectedStudent.name.trim(),
+        studentRegNumber: cleanCollectorReg,
+        studentEmail: selectedStudent.email,
+        studentMobile: selectedStudent.mobileNumber,
+        studentCode: selectedStudent.studentCode,
+        projectCode: projectCode.code,
+        facultyName: projectCode.faculty?.name,
+        facultyMobile: projectCode.faculty?.mobileNumber,
+        componentCode: item.component.code,
+        componentName: item.component.name,
+        category: item.component.category,
+        quantity: item.quantity,
+        issueDate: new Date(),
+        dueDate: dueDate,
+        adminName: adminName || 'Lab Admin',
+        projectPurpose: notes || `Project Code: ${projectCode.code}`,
+        transactionId: txId
+      }).catch(e => console.warn("Project issue email error:", e));
+    }
+  } catch (mailErr) {
+    console.warn("Could not dispatch project code issue emails:", mailErr);
+  }
+
   return txIds;
 }
 
@@ -873,11 +936,13 @@ export async function issueMultipleComponentsToStudent(params: {
     const transactionData: Partial<Transaction> = {
       id: txRef.id,
       componentId: item.component.id,
+      componentCode: item.component.code || undefined,
       componentName: item.component.name,
       studentId: student.uid || '',
       studentName: student.name.trim(),
       studentRegNumber: cleanCollectorReg,
       studentEmail: (student.email || '').trim().toLowerCase(),
+      studentMobile: student.mobileNumber || '',
       studentCode: student.studentCode || undefined,
       quantity: item.quantity,
       returnedQuantity: 0,
@@ -933,7 +998,54 @@ export async function issueMultipleComponentsToStudent(params: {
     notif.userId = student.uid;
   }
   batch.set(notifRef, cleanForFirestore(notif));
-
   await batch.commit();
+
+  // 5. Send automated email alerts to admin with complete student details
+  try {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const txId = txIds[i];
+      notifyAdminOnIssue({
+        studentName: student.name.trim(),
+        studentRegNumber: cleanCollectorReg,
+        studentEmail: student.email,
+        studentMobile: student.mobileNumber,
+        studentCode: student.studentCode,
+        componentCode: item.component.code,
+        componentName: item.component.name,
+        category: item.component.category,
+        quantity: item.quantity,
+        issueDate: new Date(),
+        dueDate: dueDate,
+        adminName: adminName || 'Lab Admin',
+        projectPurpose: notes || undefined,
+        transactionId: txId
+      }).catch(e => console.warn("Issue email error:", e));
+    }
+  } catch (mailErr) {
+    console.warn("Could not dispatch issue email alert:", mailErr);
+  }
+
   return txIds;
 }
+
+/**
+ * Computes next sequential laboratory component code: "IIC-C1", "IIC-C2", "IIC-C3", ...
+ * where "C" stands for Component.
+ */
+export function computeNextComponentCode(components: Component[]): string {
+  const prefix = 'IIC-C';
+  let maxNum = 0;
+  for (const comp of components) {
+    const raw = (comp.code || '').trim().toUpperCase();
+    if (raw.startsWith(prefix)) {
+      const numPart = raw.substring(prefix.length);
+      const parsed = parseInt(numPart, 10);
+      if (!isNaN(parsed) && parsed > maxNum) {
+        maxNum = parsed;
+      }
+    }
+  }
+  return `${prefix}${maxNum + 1}`;
+}
+

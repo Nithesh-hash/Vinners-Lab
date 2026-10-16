@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 
 // Pages
 import Landing from './pages/Landing';
+import ExploreComponents from './pages/ExploreComponents';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import StudentDashboard from './pages/StudentDashboard';
@@ -19,6 +20,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/explore" element={<ExploreComponents />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           

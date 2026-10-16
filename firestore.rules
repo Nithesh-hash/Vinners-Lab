@@ -18,7 +18,7 @@ service cloud.firestore {
     }
 
     match /inventory/{itemId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 

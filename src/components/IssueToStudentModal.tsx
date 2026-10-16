@@ -613,7 +613,7 @@ export default function IssueToStudentModal({
                               value={comp.id}
                               disabled={comp.availableQuantity <= 0}
                             >
-                              {comp.name} ({comp.availableQuantity} available) - {comp.category}
+                              {comp.code ? `[${comp.code}] ` : ''}{comp.name} ({comp.availableQuantity} available) - {comp.category}
                             </option>
                           ))}
                           <option value="__OTHER__">✨ Others (Type manually)</option>

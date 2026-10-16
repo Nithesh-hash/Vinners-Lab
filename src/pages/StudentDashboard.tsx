@@ -615,7 +615,14 @@ export default function StudentDashboard() {
                           return (
                             <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors">
                               <td className="px-6 py-4">
-                                <p className="font-bold text-slate-900">{tx.componentName}</p>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="font-bold text-slate-900">{tx.componentName}</p>
+                                  {tx.componentCode && (
+                                    <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                                      {tx.componentCode}
+                                    </span>
+                                  )}
+                                </div>
                                 {tx.projectCode ? (
                                   <span className="font-mono text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-md inline-flex items-center gap-1 mt-1">
                                     <span>Code:</span>
