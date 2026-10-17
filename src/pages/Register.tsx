@@ -6,6 +6,7 @@ import { auth, db } from '@/lib/firebase';
 import { GraduationCap, Briefcase, CheckCircle2, Copy, Check, ArrowRight, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getNextStudentCode, getAcademicYear } from '@/lib/projectCodeService';
+import DeveloperBadge from '@/components/DeveloperBadge';
 
 export default function Register() {
   const [accountType, setAccountType] = useState<'student' | 'faculty'>('student');
@@ -96,7 +97,10 @@ export default function Register() {
 
   if (createdStudentCode) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-3 sm:p-4 font-sans">
+      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-3 sm:p-4 font-sans relative">
+        <div className="absolute top-4 right-4 z-20">
+          <DeveloperBadge />
+        </div>
         <div className="w-full max-w-[480px] bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 sm:p-8 md:p-9 border border-slate-200/90 text-center space-y-5 animate-in zoom-in-95 duration-300">
           <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
             <CheckCircle2 className="w-8 h-8" />
@@ -166,7 +170,10 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-3 sm:p-4 font-sans">
+    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-3 sm:p-4 font-sans relative">
+      <div className="absolute top-4 right-4 z-20">
+        <DeveloperBadge />
+      </div>
       <div className="w-full max-w-[460px] bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 sm:p-8 md:p-9 border border-slate-200/90">
         
         {/* Role Toggle */}

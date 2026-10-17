@@ -4,6 +4,7 @@ import { LogOut, User, LayoutDashboard, History, Settings, X, Menu, QrCode, Bell
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import NotificationsModal from './NotificationsModal';
+import DeveloperBadge from './DeveloperBadge';
 
 export default function Layout() {
   const { profile, signOut } = useAuth();
@@ -93,22 +94,33 @@ export default function Layout() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-dvh min-w-0 max-w-full overflow-x-hidden">
-        {/* Mobile Header */}
-        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-2xs">
+        {/* Top Header */}
+        <header className="flex items-center justify-between px-4 sm:px-6 py-2.5 sm:py-3 bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-2xs">
           <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="Vinner Lab Logo" className="w-7 h-7 rounded-lg shadow-xs border border-slate-200 shrink-0" />
-            <span className="text-base font-extrabold text-slate-900 tracking-tight">Vinner Lab</span>
+            <div className="md:hidden flex items-center gap-2.5">
+              <img src="/logo.png" alt="Vinner Lab Logo" className="w-7 h-7 rounded-lg shadow-xs border border-slate-200 shrink-0" />
+              <span className="text-base font-extrabold text-slate-900 tracking-tight">Vinner Lab</span>
+            </div>
+            <div className="hidden md:flex items-center gap-2">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                {isAdmin ? 'Admin Console' : 'Student & Faculty Portal'}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
+            <DeveloperBadge />
             <button
+              type="button"
               onClick={() => setIsNotificationsOpen(true)}
               className="p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl border border-slate-200 transition-all cursor-pointer"
               aria-label="Notifications"
+              title="Alerts & Notifications"
             >
               <Bell className="w-4 h-4" />
             </button>
             <button 
-              className="p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl border border-slate-200 transition-all cursor-pointer"
+              type="button"
+              className="md:hidden p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl border border-slate-200 transition-all cursor-pointer"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label="Toggle navigation menu"
             >

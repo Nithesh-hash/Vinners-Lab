@@ -5,6 +5,7 @@ import { auth, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import type { UserProfile } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import DeveloperBadge from '@/components/DeveloperBadge';
 
 export default function Login() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -75,7 +76,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-3 sm:p-4">
+    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-3 sm:p-4 relative">
+      <div className="absolute top-4 right-4 z-20">
+        <DeveloperBadge />
+      </div>
       <div className="w-full max-w-[440px] bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 sm:p-8 md:p-10 border border-slate-100">
         
         {/* Toggle */}

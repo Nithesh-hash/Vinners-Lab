@@ -2,6 +2,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import DeveloperBadge from '@/components/DeveloperBadge';
 
 export default function Landing() {
   const { user, profile, loading } = useAuth();
@@ -52,6 +53,7 @@ export default function Landing() {
           <span className="text-2xl font-bold text-slate-900 tracking-tight">Vinner Lab</span>
         </div>
         <div className="flex items-center gap-2 sm:gap-4">
+          <DeveloperBadge />
           <Link to="/explore" className="px-3 sm:px-4 py-2 text-slate-700 font-medium hover:text-brand-600 transition-colors text-sm sm:text-base">Explore</Link>
           <Link to="/login" className="px-3 sm:px-4 py-2 text-slate-700 font-medium hover:text-brand-600 transition-colors text-sm sm:text-base">Log In</Link>
           <Link to="/register" className="hidden sm:inline-flex items-center px-5 py-2 rounded-full bg-white/60 hover:bg-white/80 text-slate-700 font-medium text-sm border border-slate-300/60 shadow-xs backdrop-blur-md transition-all">Register</Link>

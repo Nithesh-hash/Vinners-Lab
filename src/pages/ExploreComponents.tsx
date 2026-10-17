@@ -28,6 +28,7 @@ import {
   Zap
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import DeveloperBadge from '@/components/DeveloperBadge';
 
 export default function ExploreComponents() {
   const { user, profile } = useAuth();
@@ -283,8 +284,10 @@ export default function ExploreComponents() {
               </div>
             </div>
 
-            {/* Right: Realtime status, Fullscreen, and Auth actions */}
+            {/* Right: Realtime status, Fullscreen, Developer badge, and Auth actions */}
             <div className="flex items-center gap-2 sm:gap-3">
+              <DeveloperBadge />
+
               {/* Live sync pulse badge */}
               <div 
                 className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold"
