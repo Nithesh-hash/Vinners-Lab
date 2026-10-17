@@ -115,15 +115,89 @@ export interface NotificationItem {
   id: string;
   userId?: string;
   targetRegNumber?: string; // studentRegNumber or facultyEmployeeId
-  roleTarget?: 'student' | 'faculty' | 'all';
+  roleTarget?: 'student' | 'faculty' | 'admin' | 'all';
   title: string;
   message: string;
-  type: 'code_generated' | 'component_issued' | 'due_date_warning' | 'overdue_alert';
+  type: 
+    | 'code_generated' 
+    | 'component_issued' 
+    | 'due_date_warning' 
+    | 'overdue_alert'
+    | 'issue_request_submitted'
+    | 'issue_request_approved'
+    | 'issue_request_partially_issued'
+    | 'issue_request_completed'
+    | 'issue_request_rejected';
   projectCode?: string;
   componentName?: string;
+  requestId?: string;
   dueDate?: any;
   isRead: boolean;
   createdAt: any;
   urgency?: 'info' | 'warning' | 'danger';
 }
+
+export interface IssueRequestItem {
+  componentId: string;
+  componentCode?: string;
+  componentName: string;
+  category?: string;
+  imageUrl?: string;
+  requestedQuantity: number;
+  approvedQuantity?: number; // Editable by admin (e.g. reduced count)
+  issuedQuantity?: number;   // Cumulative units handed over at counter
+  unitsIssuedSoFar?: number; // Cumulative units handed over at counter (alias)
+  status?: 'pending' | 'approved' | 'issued' | 'declined';
+  notes?: string;
+}
+
+export interface IssueRequestLog {
+  timestamp: any;
+  action: 'submitted' | 'approved' | 'partially_issued' | 'completed' | 'rejected' | 'updated';
+  actorId: string;
+  actorName: string;
+  actorRole: 'student' | 'faculty' | 'admin';
+  note?: string;
+  itemsIssued?: Array<{
+    componentId: string;
+    componentName: string;
+    quantity: number;
+  }>;
+}
+
+export interface IssueRequest {
+  id: string;
+  requestCode: string; // e.g. "REQ-2026-0001"
+  requesterUid: string;
+  requesterName: string;
+  requesterRegNumber: string; // Student Reg Number or Faculty Employee ID
+  requesterEmail?: string;
+  requesterMobile?: string;
+  requesterRole: 'student' | 'faculty';
+  studentCode?: string; // e.g. "IIC2026-27-0001"
+  
+  // SSV / FSV Project linkage (optional)
+  projectCode?: string; // e.g. "SSV2026-27-0001" or "FSV2026-27-0001"
+  recipientType?: 'student' | 'faculty';
+  recipientName?: string;
+  recipientRegNumber?: string;
+  
+  items: IssueRequestItem[];
+  purposeNotes?: string;
+  
+  status: 'pending' | 'approved' | 'partially_issued' | 'completed' | 'rejected';
+  
+  adminNotes?: string;
+  rejectionReason?: string;
+  
+  createdAt: any; // Firestore timestamp
+  updatedAt?: any;
+  approvedAt?: any;
+  approvedByAdminId?: string;
+  approvedByAdminName?: string;
+  
+  // Detailed audit trail of handovers and actions
+  logs?: IssueRequestLog[];
+}
+
 

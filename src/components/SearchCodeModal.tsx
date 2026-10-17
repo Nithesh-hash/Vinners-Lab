@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   X, 
   Search, 
@@ -9,11 +9,12 @@ import {
   Users, 
   Check,
   Plus,
-  Trash2 
+  Trash2,
+  GraduationCap
 } from 'lucide-react';
 import { doc, getDoc, collection, getDocs, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { ProjectCode, ProjectMember, Component, ProjectFaculty } from '@/types';
+import type { ProjectCode, Component, ProjectFaculty } from '@/types';
 import { issueMultipleComponentsUnderProjectCode, getDueDateStatus } from '@/lib/projectCodeService';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -39,6 +40,16 @@ interface IssueItemRow {
   customName?: string;
 }
 
+export interface RecipientOption {
+  type: 'student' | 'faculty';
+  name: string;
+  regNumber: string; // student regNumber or faculty employeeId
+  mobileNumber?: string;
+  email?: string;
+  uid?: string;
+  studentCode?: string;
+}
+
 export default function SearchCodeModal({
   isOpen,
   onClose,
@@ -56,7 +67,7 @@ export default function SearchCodeModal({
   const [searchError, setSearchError] = useState('');
 
   // Issuance state (supports multiple components issued together)
-  const [selectedStudent, setSelectedStudent] = useState<ProjectMember | null>(null);
+  const [selectedRecipient, setSelectedRecipient] = useState<RecipientOption | null>(null);
   const [issueItems, setIssueItems] = useState<IssueItemRow[]>([
     { id: 'item_1', componentId: '', quantity: 1 }
   ]);
@@ -117,9 +128,18 @@ export default function SearchCodeModal({
       if (docSnap.exists()) {
         const data = { id: docSnap.id, ...docSnap.data() } as ProjectCode;
         setActiveProjectCode(data);
-        // By default, select the first student in the team
+        // By default, select the first student or faculty advisor in the team
         if (data.students && data.students.length > 0) {
-          setSelectedStudent(data.students[0]);
+          setSelectedRecipient({ ...data.students[0], type: 'student' });
+        } else if (data.faculty) {
+          setSelectedRecipient({
+            name: data.faculty.name,
+            regNumber: data.faculty.employeeId,
+            mobileNumber: data.faculty.mobileNumber,
+            email: data.faculty.email,
+            uid: data.faculty.uid,
+            type: 'faculty'
+          });
         }
       } else {
         setActiveProjectCode(null);
@@ -154,7 +174,7 @@ export default function SearchCodeModal({
     } else {
       // Reset
       setActiveProjectCode(null);
-      setSelectedStudent(null);
+      setSelectedRecipient(null);
       setIssueItems([{ id: 'item_1', componentId: '', quantity: 1 }]);
       setIssueSuccessMsg('');
       setIssueError('');
@@ -165,8 +185,8 @@ export default function SearchCodeModal({
   const handleIssueComponent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeProjectCode) return;
-    if (!selectedStudent) {
-      setIssueError('Please select which student is collecting the component(s).');
+    if (!selectedRecipient) {
+      setIssueError('Please select which student or teacher is collecting the component(s).');
       return;
     }
 
@@ -240,7 +260,7 @@ export default function SearchCodeModal({
       const selectedDueDate = new Date(`${dueDateStr}T23:59:59`);
       await issueMultipleComponentsUnderProjectCode({
         projectCode: activeProjectCode,
-        selectedStudent,
+        selectedRecipient,
         items: itemsToIssue,
         dueDate: selectedDueDate,
         adminId: profile?.uid || 'admin',
@@ -255,7 +275,7 @@ export default function SearchCodeModal({
       }
 
       const summaryText = itemsToIssue.map(i => `${i.quantity}x "${i.component.name}"`).join(', ');
-      setIssueSuccessMsg(`Successfully issued ${itemsToIssue.length} component(s) (${summaryText}) together to ${selectedStudent.name} (${selectedStudent.regNumber}) under Code ${activeProjectCode.code}!`);
+      setIssueSuccessMsg(`Successfully issued ${itemsToIssue.length} component(s) (${summaryText}) together to ${selectedRecipient.name} (${selectedRecipient.regNumber} • ${selectedRecipient.type === 'faculty' ? 'Teacher / Faculty' : 'Student'}) under Code ${activeProjectCode.code}!`);
       
       setIssueItems([{ id: Math.random().toString(36).substring(2, 9), componentId: '', quantity: 1 }]);
       setAdminNotes('');
@@ -429,65 +449,146 @@ export default function SearchCodeModal({
                 </div>
               )}
 
-              {/* SECTION: SELECT STUDENT TO ISSUE TO */}
+              {/* SECTION: SELECT RECIPIENT (TEACHERS OR STUDENTS) */}
               <div className="border border-slate-200/90 rounded-2xl p-4 sm:p-5 bg-white shadow-2xs space-y-3.5">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">
                       <Users className="w-4 h-4" />
                     </div>
                     <div>
                       <h4 className="text-sm font-extrabold text-slate-900">
-                        Select Collecting Student *
+                        Select Recipient (Faculty Guide or Student) *
                       </h4>
                       <p className="text-[11px] text-slate-500">
-                        Component is registered under their name and reflects in all other members' & faculty dashboards
+                        Both students and teachers can receive components under SSV and FSV
                       </p>
                     </div>
                   </div>
 
-                  {selectedStudent && (
-                    <span className="text-[11px] font-bold text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
-                      Selected: {selectedStudent.name}
+                  {selectedRecipient && (
+                    <span className="text-[11px] font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200 inline-flex items-center gap-1.5 self-start sm:self-auto">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span>Recipient: <strong>{selectedRecipient.name}</strong> ({selectedRecipient.type === 'faculty' ? 'Teacher' : 'Student'})</span>
                     </span>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                  {activeProjectCode.students.map((student) => {
-                    const isSelected = selectedStudent?.regNumber === student.regNumber;
-                    return (
-                      <button
-                        key={student.regNumber}
-                        type="button"
-                        onClick={() => setSelectedStudent(student)}
-                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer relative ${
-                          isSelected
-                            ? 'border-black bg-slate-900 text-white shadow-xs'
-                            : 'border-slate-200 bg-slate-50 hover:border-slate-300 text-slate-800'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-bold text-xs leading-tight">{student.name}</p>
-                            <p className={`font-mono text-[10px] mt-0.5 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
-                              {student.regNumber}
-                            </p>
-                          </div>
-                          {isSelected && (
-                            <div className="w-5 h-5 rounded-full bg-white text-slate-900 flex items-center justify-center">
-                              <Check className="w-3 h-3 stroke-[3]" />
+                {/* Faculty Guides Selection */}
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5 flex items-center gap-1">
+                    <GraduationCap className="w-3.5 h-3.5 text-indigo-600" />
+                    Faculty Advisors / Teachers
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {([activeProjectCode.faculty, activeProjectCode.faculty2].filter(Boolean) as ProjectFaculty[]).map((fac, idx) => {
+                      const isSelected = selectedRecipient?.regNumber === fac.employeeId;
+                      return (
+                        <button
+                          key={`fac_${fac.employeeId}_${idx}`}
+                          type="button"
+                          onClick={() => setSelectedRecipient({
+                            name: fac.name,
+                            regNumber: fac.employeeId,
+                            mobileNumber: fac.mobileNumber,
+                            email: fac.email,
+                            uid: fac.uid,
+                            type: 'faculty'
+                          })}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer relative ${
+                            isSelected
+                              ? 'border-indigo-600 bg-slate-900 text-white shadow-xs'
+                              : 'border-indigo-100 bg-indigo-50/40 hover:bg-indigo-50/80 text-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="font-bold text-xs leading-tight">{fac.name}</p>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                                  isSelected ? 'bg-indigo-500 text-white' : 'bg-indigo-100 text-indigo-700'
+                                }`}>
+                                  Faculty
+                                </span>
+                              </div>
+                              <p className={`font-mono text-[10px] mt-0.5 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+                                Emp ID: {fac.employeeId}
+                              </p>
                             </div>
+                            {isSelected && (
+                              <div className="w-5 h-5 rounded-full bg-white text-slate-900 flex items-center justify-center shrink-0">
+                                <Check className="w-3 h-3 stroke-[3]" />
+                              </div>
+                            )}
+                          </div>
+                          {fac.mobileNumber && (
+                            <p className={`text-[10px] font-mono mt-1 ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>
+                              📞 {fac.mobileNumber}
+                            </p>
                           )}
-                        </div>
-                        {student.mobileNumber && (
-                          <p className={`text-[10px] font-mono mt-1 ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>
-                            📞 {student.mobileNumber}
-                          </p>
-                        )}
-                      </button>
-                    );
-                  })}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Team Students Selection */}
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5 flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 text-blue-600" />
+                    Team Students
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {activeProjectCode.students.map((student) => {
+                      const isSelected = selectedRecipient?.regNumber === student.regNumber;
+                      return (
+                        <button
+                          key={student.regNumber}
+                          type="button"
+                          onClick={() => setSelectedRecipient({
+                            name: student.name,
+                            regNumber: student.regNumber,
+                            mobileNumber: student.mobileNumber,
+                            email: student.email,
+                            uid: student.uid,
+                            studentCode: student.studentCode,
+                            type: 'student'
+                          })}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer relative ${
+                            isSelected
+                              ? 'border-black bg-slate-900 text-white shadow-xs'
+                              : 'border-slate-200 bg-slate-50 hover:border-slate-300 text-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="font-bold text-xs leading-tight">{student.name}</p>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                                  isSelected ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'
+                                }`}>
+                                  Student
+                                </span>
+                              </div>
+                              <p className={`font-mono text-[10px] mt-0.5 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+                                Reg: {student.regNumber}
+                              </p>
+                            </div>
+                            {isSelected && (
+                              <div className="w-5 h-5 rounded-full bg-white text-slate-900 flex items-center justify-center shrink-0">
+                                <Check className="w-3 h-3 stroke-[3]" />
+                              </div>
+                            )}
+                          </div>
+                          {student.mobileNumber && (
+                            <p className={`text-[10px] font-mono mt-1 ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>
+                              📞 {student.mobileNumber}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -675,7 +776,7 @@ export default function SearchCodeModal({
                 <div className="pt-2 flex justify-end">
                   <button
                     type="submit"
-                    disabled={isIssuing || !selectedStudent || issueItems.some(i => !i.componentId || (i.componentId === '__OTHER__' && !i.customName?.trim()))}
+                    disabled={isIssuing || !selectedRecipient || issueItems.some(i => !i.componentId || (i.componentId === '__OTHER__' && !i.customName?.trim()))}
                     className="w-full sm:w-auto px-6 py-3 rounded-full bg-slate-900 hover:bg-black text-white text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     {isIssuing ? (
@@ -686,7 +787,7 @@ export default function SearchCodeModal({
                     ) : (
                       <>
                         <Package className="w-4 h-4 text-emerald-300" />
-                        Issue {issueItems.length > 1 ? `${issueItems.length} Components Together` : 'Component'} to {selectedStudent?.name || 'Selected Student'}
+                        Issue {issueItems.length > 1 ? `${issueItems.length} Components Together` : 'Component'} to {selectedRecipient?.name || 'Selected Recipient'}
                       </>
                     )}
                   </button>

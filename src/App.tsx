@@ -11,7 +11,9 @@ import Register from './pages/Register';
 import StudentDashboard from './pages/StudentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminScanReturn from './pages/AdminScanReturn';
+import AdminScanRequest from './pages/AdminScanRequest';
 import ReturnLoan from './pages/ReturnLoan';
+import ProcessRequest from './pages/ProcessRequest';
 import NotFound from './pages/NotFound';
 
 function App() {
@@ -50,10 +52,26 @@ function App() {
               } 
             />
             <Route 
+              path="/admin/scan-request" 
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminScanRequest />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/admin/return-loan" 
               element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <ReturnLoan />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/process-request" 
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <ProcessRequest />
                 </ProtectedRoute>
               } 
             />

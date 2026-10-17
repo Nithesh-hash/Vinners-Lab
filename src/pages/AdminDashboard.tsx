@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, getDocs, doc, writeBatch, where, Timestamp, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Transaction, Component, ProjectCode, ProjectFaculty } from '@/types';
+import type { Transaction, Component, ProjectCode, ProjectFaculty, IssueRequest, IssueRequestItem } from '@/types';
 import { 
   Plus, 
   Search, 
@@ -25,16 +25,22 @@ import {
   Send,
   ShieldCheck,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  User,
+  AlertCircle,
+  Check,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import GenerateCodeModal from '@/components/GenerateCodeModal';
 import SearchCodeModal from '@/components/SearchCodeModal';
 import IssueToStudentModal from '@/components/IssueToStudentModal';
 import NotificationsModal from '@/components/NotificationsModal';
+import IssueInvoiceModal from '@/components/IssueInvoiceModal';
 import ImageUploadField from '@/components/ImageUploadField';
 import { getDueDateStatus, checkAndAutoSendDueDateNotifications, deleteProjectCodeRecord, computeNextComponentCode } from '@/lib/projectCodeService';
 import { getEmailConfig, saveEmailConfig, sendTestEmail, notifyAdminOnIssue, DEFAULT_EMAIL_CONFIG, type EmailConfig } from '@/lib/emailService';
+import { adminProcessIssueRequest, adminRejectIssueRequest } from '@/lib/issueRequestService';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -96,6 +102,7 @@ export default function AdminDashboard() {
   const [showIssueToStudentModal, setShowIssueToStudentModal] = useState(false);
   const [searchModalInitialCode, setSearchModalInitialCode] = useState('');
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [selectedReqForInvoice, setSelectedReqForInvoice] = useState<IssueRequest | null>(null);
 
   // Delete team state
   const [teamToDelete, setTeamToDelete] = useState<ProjectCode | null>(null);
@@ -182,6 +189,84 @@ export default function AdminDashboard() {
     }
   };
 
+  // Issue Requests State & Handlers
+  const [issueRequests, setIssueRequests] = useState<IssueRequest[]>([]);
+  const [requestFilter, setRequestFilter] = useState<'all' | 'pending' | 'approved' | 'partially_issued' | 'completed' | 'rejected'>('all');
+  const [reqSearchQuery, setReqSearchQuery] = useState('');
+  const [reqEditedItems, setReqEditedItems] = useState<Record<string, IssueRequestItem[]>>({});
+  const [reqAdminNotes, setReqAdminNotes] = useState<Record<string, string>>({});
+  const [processingReqId, setProcessingReqId] = useState<string | null>(null);
+  const [rejectingReq, setRejectingReq] = useState<IssueRequest | null>(null);
+  const [rejectReasonInput, setRejectReasonInput] = useState('');
+  const [requestSuccessMsg, setRequestSuccessMsg] = useState('');
+
+  const getItemsForReq = (req: IssueRequest): IssueRequestItem[] => {
+    return reqEditedItems[req.id] || req.items;
+  };
+
+  const handleAdjustReqItemQty = (req: IssueRequest, componentId: string, newQty: number) => {
+    const currentItems = getItemsForReq(req);
+    const updated = currentItems.map(it => {
+      if (it.componentId === componentId) {
+        return { ...it, approvedQuantity: Math.max(1, newQty) };
+      }
+      return it;
+    });
+    setReqEditedItems(prev => ({ ...prev, [req.id]: updated }));
+  };
+
+  const handleRemoveReqItem = (req: IssueRequest, componentId: string) => {
+    const currentItems = getItemsForReq(req);
+    if (currentItems.length <= 1) {
+      alert("A request must contain at least 1 component. If declining the whole request, click Decline Request.");
+      return;
+    }
+    const updated = currentItems.filter(it => it.componentId !== componentId);
+    setReqEditedItems(prev => ({ ...prev, [req.id]: updated }));
+  };
+
+  const handleAdminApproveReq = async (req: IssueRequest) => {
+    setProcessingReqId(req.id);
+    try {
+      const itemsToApprove = getItemsForReq(req);
+      const notes = reqAdminNotes[req.id] ?? req.adminNotes ?? '';
+      await adminProcessIssueRequest({
+        requestId: req.id,
+        approvedItems: itemsToApprove,
+        adminNotes: notes,
+        adminId: profile?.uid || 'admin',
+        adminName: profile?.name || 'Administrator'
+      });
+      setRequestSuccessMsg(`Issue Request ${req.requestCode} has been approved! The student can now present their Pickup QR pass.`);
+      setTimeout(() => setRequestSuccessMsg(''), 5000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to approve request.');
+    } finally {
+      setProcessingReqId(null);
+    }
+  };
+
+  const handleAdminConfirmReject = async () => {
+    if (!rejectingReq) return;
+    setProcessingReqId(rejectingReq.id);
+    try {
+      await adminRejectIssueRequest({
+        requestId: rejectingReq.id,
+        reason: rejectReasonInput.trim() || 'Declined by Administrator',
+        adminId: profile?.uid || 'admin',
+        adminName: profile?.name || 'Administrator'
+      });
+      setRequestSuccessMsg(`Issue Request ${rejectingReq.requestCode} was declined.`);
+      setTimeout(() => setRequestSuccessMsg(''), 5000);
+      setRejectingReq(null);
+      setRejectReasonInput('');
+    } catch (err: any) {
+      alert(err.message || 'Failed to decline request.');
+    } finally {
+      setProcessingReqId(null);
+    }
+  };
+
   useEffect(() => {
     setLoading(true);
 
@@ -196,6 +281,15 @@ export default function AdminDashboard() {
     }, (error) => {
       console.error("Error fetching transactions:", error);
       setLoading(false);
+    });
+
+    const requestsQuery = query(collection(db, 'issue_requests'));
+    const unsubscribeRequests = onSnapshot(requestsQuery, (snapshot) => {
+      const reqData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IssueRequest));
+      reqData.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setIssueRequests(reqData);
+    }, (err) => {
+      console.warn("Error fetching issue requests:", err);
     });
 
     const invQuery = query(collection(db, 'inventory'));
@@ -279,6 +373,7 @@ export default function AdminDashboard() {
 
     return () => {
       unsubscribeTx();
+      unsubscribeRequests();
       unsubscribeInv();
       unsubscribeCodes();
     };
@@ -716,6 +811,23 @@ export default function AdminDashboard() {
           Project Codes ({projectCodes.length})
         </button>
         <button 
+          onClick={() => setActiveTab('requests')} 
+          className={cn(
+            "px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5", 
+            activeTab === 'requests' 
+              ? "bg-slate-900 text-white shadow-xs" 
+              : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+          )}
+        >
+          <Layers className="w-3.5 h-3.5 text-amber-500" />
+          <span>Issue Requests</span>
+          {issueRequests.filter(r => r.status === 'pending').length > 0 && (
+            <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
+              {issueRequests.filter(r => r.status === 'pending').length}
+            </span>
+          )}
+        </button>
+        <button 
           onClick={() => setActiveTab('transactions')} 
           className={cn(
             "px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap", 
@@ -750,6 +862,14 @@ export default function AdminDashboard() {
           Mail Alerts
         </button>
       </div>
+
+      {/* Success Notification Banner for Issue Requests */}
+      {requestSuccessMsg && (
+        <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 p-3.5 rounded-2xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{requestSuccessMsg}</span>
+        </div>
+      )}
 
       {/* TAB 1: HARDWARE INVENTORY (Exact Reference UI 2-Column Cards Grid) */}
       {activeTab === 'inventory' && (
@@ -1466,6 +1586,479 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* TAB 6: HARDWARE ISSUE REQUESTS CONSOLE */}
+      {activeTab === 'requests' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">Hardware Issue Requests Console</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Review student & teacher requests, adjust approved quantities, delete unavailable components, and authorize pickup passes.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/admin/scan-request')}
+                className="px-4 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>Scan Request QR Pass</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Status Filter Tabs & Search */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+              {[
+                { id: 'all', label: 'All Requests', count: issueRequests.length },
+                { id: 'pending', label: 'Pending Review', count: issueRequests.filter(r => r.status === 'pending').length },
+                { id: 'approved', label: 'Ready for Pickup', count: issueRequests.filter(r => r.status === 'approved').length },
+                { id: 'partially_issued', label: 'Partially Issued', count: issueRequests.filter(r => r.status === 'partially_issued').length },
+                { id: 'completed', label: 'Completed', count: issueRequests.filter(r => r.status === 'completed').length },
+                { id: 'rejected', label: 'Declined', count: issueRequests.filter(r => r.status === 'rejected').length },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setRequestFilter(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    requestFilter === tab.id
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] ${
+                    requestFilter === tab.id ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="relative w-full sm:w-64 shrink-0">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search requester, code..."
+                value={reqSearchQuery}
+                onChange={(e) => setReqSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 rounded-full border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-black"
+              />
+            </div>
+          </div>
+
+          {/* Requests List */}
+          {(() => {
+            const filtered = issueRequests.filter(req => {
+              if (requestFilter !== 'all' && req.status !== requestFilter) return false;
+              if (reqSearchQuery.trim()) {
+                const q = reqSearchQuery.toLowerCase();
+                const matchesRequester = (req.requesterName || '').toLowerCase().includes(q) ||
+                  (req.requesterRegNumber || '').toLowerCase().includes(q) ||
+                  (req.recipientName || '').toLowerCase().includes(q) ||
+                  (req.recipientRegNumber || '').toLowerCase().includes(q) ||
+                  (req.requestCode || '').toLowerCase().includes(q) ||
+                  (req.projectCode || '').toLowerCase().includes(q) ||
+                  req.items.some(i => i.componentName.toLowerCase().includes(q));
+                if (!matchesRequester) return false;
+              }
+              return true;
+            });
+
+            if (filtered.length === 0) {
+              return (
+                <div className="py-16 text-center bg-white rounded-3xl border border-slate-200/80 p-6 space-y-2">
+                  <Package className="w-10 h-10 text-slate-300 mx-auto" />
+                  <p className="text-sm font-bold text-slate-700">No hardware issue requests found</p>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    {requestFilter === 'pending'
+                      ? 'No requests are currently awaiting administrator review.'
+                      : 'No issue requests match the selected filter or search query.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-4">
+                {filtered.map(req => {
+                  const currentItems = getItemsForReq(req);
+                  const isPending = req.status === 'pending';
+                  const isApproved = req.status === 'approved';
+                  const isPartial = req.status === 'partially_issued';
+                  const isCompleted = req.status === 'completed';
+                  const isRejected = req.status === 'rejected';
+
+                  const isFacultyRequester = req.recipientType === 'faculty' || req.requesterRole === 'faculty';
+
+                  return (
+                    <div
+                      key={req.id}
+                      className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-5 sm:p-6 space-y-4 hover:border-slate-300 transition-all"
+                    >
+                      {/* Top Bar */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className="font-mono text-base font-extrabold text-slate-900 tracking-wider">
+                            {req.requestCode}
+                          </span>
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${
+                            isPending
+                              ? 'bg-amber-50 text-amber-700 border-amber-300'
+                              : isApproved
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : isPartial
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-300'
+                              : isCompleted
+                              ? 'bg-slate-100 text-slate-700 border-slate-300'
+                              : 'bg-rose-50 text-rose-700 border-rose-300'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              isPending ? 'bg-amber-500 animate-pulse' : isApproved ? 'bg-emerald-500' : isPartial ? 'bg-indigo-500' : 'bg-slate-400'
+                            }`}></span>
+                            <span>
+                              {isPending
+                                ? 'Awaiting Admin Review'
+                                : isApproved
+                                ? 'Approved — Ready for Pickup'
+                                : isPartial
+                                ? 'Partially Issued'
+                                : isCompleted
+                                ? 'Fully Completed'
+                                : 'Declined'}
+                            </span>
+                          </span>
+
+                          {req.projectCode ? (
+                            <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+                              Code: {req.projectCode}
+                            </span>
+                          ) : (
+                            <span className="font-mono text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                              Direct Issue
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-xs text-slate-400 font-mono">
+                          {req.createdAt?.toDate ? req.createdAt.toDate().toLocaleString() : 'Recent'}
+                        </div>
+                      </div>
+
+                      {/* Requester & Recipient Info */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/70 p-3.5 rounded-2xl border border-slate-100 text-xs">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                            Recipient
+                          </span>
+                          <p className="font-extrabold text-slate-900 mt-0.5 flex items-center gap-1.5">
+                            {isFacultyRequester ? (
+                              <GraduationCap className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            ) : (
+                              <User className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            )}
+                            <span>{req.recipientName || req.requesterName}</span>
+                          </p>
+                          <p className="text-[11px] font-mono text-slate-500 mt-0.5">
+                            {isFacultyRequester ? 'Emp ID' : 'Reg'}: {req.recipientRegNumber || req.requesterRegNumber}
+                          </p>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                            Contact Info
+                          </span>
+                          <p className="text-slate-700 mt-0.5">
+                            {req.requesterEmail || 'No email registered'}
+                          </p>
+                          {req.requesterMobile && (
+                            <p className="text-[11px] font-mono text-slate-500 mt-0.5">
+                              📞 {req.requesterMobile}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                            Project Purpose / Notes
+                          </span>
+                          <p className="text-slate-700 mt-0.5 italic line-clamp-2">
+                            "{req.purposeNotes || 'Standard lab component issue request'}"
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Items List with Admin Authority to Reduce Count and Delete */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                          <span className="flex items-center gap-1.5">
+                            <Package className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>Requested Components ({currentItems.length})</span>
+                          </span>
+                          {isPending && (
+                            <span className="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                              Admin Authority: You can reduce count or delete items
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="border border-slate-200/80 rounded-2xl overflow-hidden divide-y divide-slate-100 bg-white">
+                          {currentItems.map((it) => {
+                            const comp = inventory.find(c => c.id === it.componentId);
+                            const approved = it.approvedQuantity ?? it.requestedQuantity;
+                            const issued = it.issuedQuantity || 0;
+                            const available = comp ? comp.availableQuantity : 0;
+
+                            return (
+                              <div key={it.componentId} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <strong className="text-slate-900 text-sm">{it.componentName}</strong>
+                                    {it.componentCode && (
+                                      <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
+                                        {it.componentCode}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">
+                                      {it.category || 'Component'}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1 flex-wrap">
+                                    <span>Requested: <strong className="text-slate-800">{it.requestedQuantity}</strong></span>
+                                    <span>•</span>
+                                    <span className={available > 0 ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
+                                      Shelf Stock: {available} available
+                                    </span>
+                                    {!isPending && (
+                                      <>
+                                        <span>•</span>
+                                        <span>Approved: <strong className="text-slate-800">{approved}</strong></span>
+                                        <span>•</span>
+                                        <span>Issued: <strong className="text-indigo-700 font-bold">{issued}</strong></span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Editable Count and Delete Button if Pending */}
+                                {isPending ? (
+                                  <div className="flex items-center gap-2 self-end sm:self-center">
+                                    <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
+                                      <span className="text-[10px] uppercase font-bold text-slate-400 px-1.5">
+                                        Approved Qty:
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAdjustReqItemQty(req, it.componentId, approved - 1)}
+                                        disabled={approved <= 1}
+                                        className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-bold text-xs hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
+                                        title="Reduce Quantity"
+                                      >
+                                        -
+                                      </button>
+                                      <span className="w-8 text-center font-mono font-bold text-slate-900 text-sm">
+                                        {approved}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAdjustReqItemQty(req, it.componentId, approved + 1)}
+                                        className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-bold text-xs hover:bg-slate-100 cursor-pointer"
+                                        title="Increase Quantity"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+
+                                    {/* Delete Component Button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveReqItem(req, it.componentId)}
+                                      className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors cursor-pointer"
+                                      title="Delete Component from this request"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="text-right">
+                                    <span className="font-bold text-slate-900 text-xs">
+                                      {issued} of {approved} issued
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Admin Notes Section */}
+                      {isPending ? (
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                            Admin Remarks for Requester (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Approved with reduced counts due to shelf availability."
+                            value={reqAdminNotes[req.id] ?? req.adminNotes ?? ''}
+                            onChange={(e) => setReqAdminNotes(prev => ({ ...prev, [req.id]: e.target.value }))}
+                            className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-black"
+                          />
+                        </div>
+                      ) : req.adminNotes ? (
+                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs text-slate-600">
+                          <strong className="text-slate-800">Admin Remarks:</strong> {req.adminNotes}
+                        </div>
+                      ) : null}
+
+                      {/* Action Bar */}
+                      <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100">
+                        <div className="text-[11px] text-slate-400">
+                          {isPending && 'Clicking "Process Request" will generate the student pickup pass and notify them.'}
+                          {isApproved && 'Approved. Student can present their QR pass to scan and receive hardware.'}
+                          {isPartial && 'Partially checked out. Student can present QR pass again to collect remaining units.'}
+                          {isCompleted && 'All approved components have been successfully checked out.'}
+                          {isRejected && `Request was declined: "${req.rejectionReason || 'Stock unavailable'}"`}
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          {isPending && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRejectingReq(req);
+                                  setRejectReasonInput('');
+                                }}
+                                disabled={processingReqId === req.id}
+                                className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                              >
+                                Decline Request
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleAdminApproveReq(req)}
+                                disabled={processingReqId === req.id}
+                                className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                {processingReqId === req.id ? (
+                                  <>
+                                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    <span>Processing...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[3]" />
+                                    <span>Process Request (Approve)</span>
+                                  </>
+                                )}
+                              </button>
+                            </>
+                          )}
+
+                          {(isApproved || isPartial || isCompleted) && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedReqForInvoice(req)}
+                              className="px-3.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                              title="View, Print & Download official Handover Invoice PDF"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Invoice PDF</span>
+                            </button>
+                          )}
+
+                          {(isApproved || isPartial) && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/admin/process-request?id=${req.id}`)}
+                                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Package className="w-3.5 h-3.5" />
+                                <span>Open Handover Console</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => navigate('/admin/scan-request')}
+                                className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <QrCode className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>Scan Student QR</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* MODAL: DECLINE REQUEST */}
+      {rejectingReq && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-6 space-y-4 border border-slate-200/90 animate-in zoom-in-95 duration-150 font-sans">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
+                <AlertCircle className="w-5 h-5" />
+                <span>Decline Issue Request</span>
+              </div>
+              <button
+                onClick={() => setRejectingReq(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Are you sure you want to decline request <strong className="font-mono text-slate-900">{rejectingReq.requestCode}</strong> from {rejectingReq.requesterName}?
+            </p>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">
+                Reason for Declining (Sent to Student / Teacher)
+              </label>
+              <textarea
+                rows={3}
+                placeholder="e.g. Components are currently reserved for classroom workshops or out of stock."
+                value={rejectReasonInput}
+                onChange={(e) => setRejectReasonInput(e.target.value)}
+                className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-black"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setRejectingReq(null)}
+                className="px-4 py-2 rounded-full border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAdminConfirmReject}
+                disabled={processingReqId === rejectingReq.id}
+                className="px-5 py-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              >
+                {processingReqId === rejectingReq.id ? 'Declining...' : 'Confirm Decline'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL 1: ADD COMPONENT */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -1849,6 +2442,12 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Official Handover Invoice & Slip Modal */}
+      <IssueInvoiceModal
+        request={selectedReqForInvoice}
+        onClose={() => setSelectedReqForInvoice(null)}
+      />
     </div>
   );
 }

@@ -43,8 +43,12 @@ export default function Layout() {
           {isAdmin && (
             <>
               <Link to="/admin/scan" className={cn("flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all", location.pathname === '/admin/scan' ? "bg-slate-900 text-white shadow-xs font-semibold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}>
-                <QrCode className="w-4 h-4" />
+                <QrCode className="w-4 h-4 text-emerald-500" />
                 Scan Return QR
+              </Link>
+              <Link to="/admin/scan-request" className={cn("flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all", location.pathname === '/admin/scan-request' ? "bg-slate-900 text-white shadow-xs font-semibold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}>
+                <QrCode className="w-4 h-4 text-indigo-500" />
+                Scan Request QR
               </Link>
               <Link to={`${dashboardPath}?tab=inventory`} className={cn("flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all", location.search.includes('tab=inventory') ? "bg-slate-900 text-white shadow-xs font-semibold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}>
                 <Settings className="w-4 h-4" />
@@ -161,8 +165,12 @@ export default function Layout() {
               {isAdmin && (
                 <>
                   <Link to="/admin/scan" onClick={() => setIsMobileMenuOpen(false)} className={cn("flex items-center gap-3 p-3 rounded-xl font-medium text-sm transition-all", location.pathname === '/admin/scan' ? "bg-slate-900 text-white font-semibold" : "text-slate-600 hover:bg-slate-100")}>
-                    <QrCode className="w-4 h-4" />
+                    <QrCode className="w-4 h-4 text-emerald-500" />
                     Scan Return QR
+                  </Link>
+                  <Link to="/admin/scan-request" onClick={() => setIsMobileMenuOpen(false)} className={cn("flex items-center gap-3 p-3 rounded-xl font-medium text-sm transition-all", location.pathname === '/admin/scan-request' ? "bg-slate-900 text-white font-semibold" : "text-slate-600 hover:bg-slate-100")}>
+                    <QrCode className="w-4 h-4 text-indigo-500" />
+                    Scan Request QR
                   </Link>
                   <Link to={`${dashboardPath}?tab=inventory`} onClick={() => setIsMobileMenuOpen(false)} className={cn("flex items-center gap-3 p-3 rounded-xl font-medium text-sm transition-all", location.search.includes('tab=inventory') ? "bg-slate-900 text-white font-semibold" : "text-slate-600 hover:bg-slate-100")}>
                     <Settings className="w-4 h-4" />

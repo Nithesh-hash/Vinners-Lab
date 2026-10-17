@@ -76,3 +76,33 @@
 ::-webkit-scrollbar-thumb {
   @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
 }
+
+/* Print optimization: When printing invoice slip, isolate and show ONLY the slip */
+@media print {
+  body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-invoice-slip,
+  #printable-invoice-slip * {
+    visibility: visible;
+  }
+
+  #printable-invoice-slip {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 8mm !important;
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}

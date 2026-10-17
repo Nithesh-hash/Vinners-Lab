@@ -571,7 +571,17 @@ export async function issueComponentUnderProjectCode(params: {
  */
 export async function issueMultipleComponentsUnderProjectCode(params: {
   projectCode: ProjectCode;
-  selectedStudent: ProjectMember;
+  selectedStudent?: ProjectMember;
+  selectedRecipient?: {
+    name: string;
+    regNumber?: string;
+    employeeId?: string;
+    mobileNumber?: string;
+    email?: string;
+    uid?: string;
+    studentCode?: string;
+    role?: 'student' | 'faculty';
+  };
   items: Array<{
     component: Component;
     quantity: number;
@@ -581,7 +591,11 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
   adminName: string;
   notes?: string;
 }): Promise<string[]> {
-  const { projectCode, selectedStudent, items, dueDate, adminId, adminName, notes } = params;
+  const { projectCode, selectedStudent, selectedRecipient, items, dueDate, adminId, adminName, notes } = params;
+  const recipient = selectedRecipient || selectedStudent;
+  if (!recipient) {
+    throw new Error('Please select a student or faculty recipient for hardware issuance.');
+  }
 
   if (items.length === 0) {
     throw new Error('At least one component must be selected.');
@@ -607,12 +621,17 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
   const txIds: string[] = [];
   const newIssuedItems: ProjectIssuedItem[] = [];
 
-  const cleanCollectorReg = selectedStudent.regNumber.trim().toUpperCase();
+  const recObj = recipient as any;
+  const cleanCollectorReg = (recObj.regNumber || recObj.employeeId || '').trim().toUpperCase();
+  const collectorName = recObj.name ? String(recObj.name).trim() : 'Recipient';
+  const isFacultyRecipient = recObj.role === 'faculty' || Boolean(recObj.employeeId);
+
   const facultyEmployeeId = (projectCode.facultyEmployeeId || projectCode.faculty?.employeeId || '').trim().toUpperCase();
   const facultyEmail = (projectCode.faculty?.email || '').trim().toLowerCase();
   const allTeamRegNumbers = Array.from(new Set([
     ...(projectCode.studentRegNumbers || []),
-    ...(projectCode.students || []).map(s => s.regNumber)
+    ...(projectCode.students || []).map(s => s.regNumber),
+    cleanCollectorReg
   ].map(r => (r || '').trim().toUpperCase()).filter(Boolean)));
 
   // 2. Create transactions for each component
@@ -625,12 +644,13 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
       componentId: item.component.id,
       componentCode: item.component.code || '',
       componentName: item.component.name,
-      studentId: selectedStudent.uid || '',
-      studentName: selectedStudent.name.trim(),
+      studentId: recipient.uid || '',
+      studentName: collectorName,
       studentRegNumber: cleanCollectorReg,
-      studentEmail: (selectedStudent.email || '').trim().toLowerCase(),
-      studentMobile: selectedStudent.mobileNumber || '',
-      studentCode: selectedStudent.studentCode || '',
+      studentEmail: (recipient.email || '').trim().toLowerCase(),
+      studentMobile: recipient.mobileNumber || '',
+      studentCode: recipient.studentCode || '',
+      recipientRole: isFacultyRecipient ? 'faculty' : 'student',
       quantity: item.quantity,
       returnedQuantity: 0,
       expectedReturnDate: dueTimestamp,
@@ -647,7 +667,7 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
       facultyMobile: projectCode.faculty?.mobileNumber || '',
       teamStudentRegNumbers: allTeamRegNumbers,
       teamStudents: projectCode.students || [],
-      collectedByStudentName: selectedStudent.name.trim(),
+      collectedByStudentName: collectorName,
       collectedByStudentRegNumber: cleanCollectorReg
     };
     batch.set(txRef, cleanForFirestore(transactionData));
@@ -658,7 +678,7 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
       componentName: item.component.name,
       quantity: item.quantity,
       returnedQuantity: 0,
-      collectedByStudentName: selectedStudent.name.trim(),
+      collectedByStudentName: collectorName,
       collectedByStudentRegNumber: cleanCollectorReg,
       issueDate: Timestamp.now(),
       expectedReturnDate: dueTimestamp,
@@ -705,7 +725,7 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
       targetRegNumber: sReg,
       roleTarget: 'student',
       title: `Hardware Issued (${items.length} items)`,
-      message: `${itemsSummary} issued to ${isCollector ? 'you' : selectedStudent.name} (${cleanCollectorReg}) under Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
+      message: `${itemsSummary} issued to ${isCollector ? 'you' : collectorName} (${cleanCollectorReg}) under Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
       type: 'component_issued',
       projectCode: projectCode.code,
       componentName: items.length === 1 ? items[0].component.name : `${items.length} components`,
@@ -734,7 +754,7 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
       targetRegNumber: fId,
       roleTarget: 'faculty',
       title: `Hardware Issued under Code ${projectCode.code}`,
-      message: `${itemsSummary} issued to student ${selectedStudent.name} (${cleanCollectorReg}) under Project Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
+      message: `${itemsSummary} issued to ${isFacultyRecipient ? 'faculty guide' : 'student'} ${collectorName} (${cleanCollectorReg}) under Project Code ${projectCode.code}. Due date: ${formattedDueDate}.`,
       type: 'component_issued',
       projectCode: projectCode.code,
       componentName: items.length === 1 ? items[0].component.name : `${items.length} components`,
@@ -757,11 +777,11 @@ export async function issueMultipleComponentsUnderProjectCode(params: {
       const item = items[i];
       const txId = txIds[i];
       notifyAdminOnIssue({
-        studentName: selectedStudent.name.trim(),
+        studentName: collectorName,
         studentRegNumber: cleanCollectorReg,
-        studentEmail: selectedStudent.email,
-        studentMobile: selectedStudent.mobileNumber,
-        studentCode: selectedStudent.studentCode,
+        studentEmail: recObj.email,
+        studentMobile: recObj.mobileNumber,
+        studentCode: recObj.studentCode,
         projectCode: projectCode.code,
         facultyName: projectCode.faculty?.name,
         facultyMobile: projectCode.faculty?.mobileNumber,

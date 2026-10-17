@@ -76,3 +76,81 @@ export function parseLoanId(rawText: string): string | null {
 
   return null;
 }
+
+/**
+ * Generate a high-contrast QR code data URL for an approved issue request ID.
+ * Error correction level 'H' ensures reliable scanning on counters.
+ */
+export async function generateRequestQR(requestId: string): Promise<string> {
+  const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
+  const payload = origin 
+    ? `${origin}/admin/process-request?id=${encodeURIComponent(requestId)}` 
+    : `labslot:request:${requestId}`;
+
+  return QRCode.toDataURL(payload, {
+    width: 400,
+    margin: 2,
+    color: {
+      dark: '#090d16', // Deep onyx slate for high contrast
+      light: '#ffffff'
+    },
+    errorCorrectionLevel: 'H'
+  });
+}
+
+/**
+ * Parses and extracts a clean Firestore Issue Request ID from scanned QR text.
+ * Supports:
+ * - URL format: https://domain/admin/process-request?id=xyz
+ * - Custom URI: labslot:request:xyz
+ * - JSON: {"type":"labslot-request","id":"xyz"}
+ * - Plain ID: xyz (alphanumeric firestore ID)
+ */
+export function parseRequestId(rawText: string): string | null {
+  if (!rawText || typeof rawText !== 'string') return null;
+  const trimmed = rawText.trim();
+
+  // 1. Check custom URI format
+  if (trimmed.startsWith('labslot:request:')) {
+    const id = trimmed.replace('labslot:request:', '').trim();
+    return id.length >= 4 ? id : null;
+  }
+
+  // 2. Check JSON format
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed.id === 'string' && parsed.id.length >= 4) {
+        return parsed.id.trim();
+      }
+    } catch {
+      // Not JSON, continue
+    }
+  }
+
+  // 3. Check URL format
+  try {
+    const url = new URL(trimmed);
+    const idParam = url.searchParams.get('id');
+    if (idParam && idParam.trim().length >= 4) {
+      return idParam.trim();
+    }
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const lastPart = pathParts[pathParts.length - 1];
+    if (pathParts.includes('process-request') || pathParts.includes('request')) {
+      if (lastPart && lastPart.length >= 4 && !lastPart.includes('.')) {
+        return lastPart;
+      }
+    }
+  } catch {
+    // Not a full URL, continue
+  }
+
+  // 4. Raw alphanumeric or REQ- formatted ID fallback
+  if (/^[a-zA-Z0-9_-]{4,64}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  return null;
+}
+
