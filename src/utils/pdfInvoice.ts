@@ -368,7 +368,9 @@ export function generateIssueInvoicePDF(request: IssueRequest, logoDataUrl?: str
   y += declarationBoxHeight + 10;
 
   // 6. SIGNATURES SECTION (Admin at left, Faculty/Student Signature at bottom right as requested)
-  const sigY = pageHeight - margin - 30;
+  // Always anchored at the bottom of the invoice page
+  const minSigY = pageHeight - margin - 32;
+  const sigY = Math.max(minSigY, y + 6);
 
   // Left Signature: Lab Administrator
   const adminSigX = margin + 6;
@@ -402,10 +404,11 @@ export function generateIssueInvoicePDF(request: IssueRequest, logoDataUrl?: str
   doc.text(`Name: ${request.recipientName || request.requesterName}`, studentSigX, sigY + 24);
   doc.text(`Reg / Emp ID: ${request.recipientRegNumber || request.requesterRegNumber}`, studentSigX, sigY + 27.5);
 
-  // Bottom Footer Notice
+  // Bottom Footer Notice (Positioned at bottom edge)
+  const footerY = Math.max(pageHeight - margin + 2, sigY + 31);
   doc.setFontSize(6.5);
   doc.setTextColor(...midGray);
-  doc.text('This is an official laboratory handover invoice. Keep a physical signed copy for laboratory audit and return verification.', pageWidth / 2, pageHeight - margin + 2, { align: 'center' });
+  doc.text('This is an official laboratory handover invoice. Keep a physical signed copy for laboratory audit and return verification.', pageWidth / 2, footerY, { align: 'center' });
 
   return doc;
 }

@@ -102,14 +102,34 @@ export default function IssueInvoiceModal({ request, onClose }: IssueInvoiceModa
               line-height: 1.35;
               width: 100%;
               height: 100%;
+              margin: 0;
+              padding: 0;
             }
             .invoice-page {
               width: 100%;
               max-width: 192mm;
+              height: 100%;
+              min-height: 275mm;
               margin: 0 auto;
               background: #ffffff !important;
+              display: flex !important;
+              flex-direction: column !important;
+              justify-content: space-between !important;
+              box-sizing: border-box !important;
               page-break-inside: avoid !important;
               page-break-after: avoid !important;
+              break-inside: avoid !important;
+            }
+            .invoice-top-content {
+              flex: 1 0 auto;
+              display: flex;
+              flex-direction: column;
+            }
+            .invoice-bottom-block {
+              margin-top: auto !important;
+              padding-top: 14px;
+              flex-shrink: 0;
+              page-break-inside: avoid !important;
               break-inside: avoid !important;
             }
             .header-bar {
@@ -356,205 +376,210 @@ export default function IssueInvoiceModal({ request, onClose }: IssueInvoiceModa
         {/* Printable Invoice Document Body (Targeted by #printable-invoice-slip) */}
         <div 
           id="printable-invoice-slip" 
-          className="p-5 sm:p-7 overflow-y-auto space-y-3.5 text-slate-900 font-sans print:p-0 print:space-y-2 bg-white"
+          className="p-5 sm:p-7 overflow-y-auto flex flex-col justify-between min-h-[780px] text-slate-900 font-sans print:p-0 print:space-y-0 bg-white"
         >
-          
-          {/* Top Institutional Header with Vinner Lab Symbol */}
-          <div className="header-bar border-b-2 border-slate-900 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="logo-group flex items-center gap-3">
-              {/* Official Vinner Lab Symbol */}
-              <img 
-                src="/logo.png" 
-                alt="Vinner Lab Logo" 
-                className="logo-img w-11 h-11 rounded-lg object-contain shrink-0 border border-slate-300 shadow-2xs bg-white p-0.5" 
-              />
-              <div>
-                <h1 className="inst-title text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                  VINNER LABORATORY & INNOVATION CENTER
-                </h1>
-                <p className="inst-sub text-[10px] text-slate-600 font-medium">
-                  Central Hardware Inventory, Microelectronics & Embedded Systems Facility
-                </p>
+          {/* Top Invoice Content */}
+          <div className="invoice-top-content space-y-3.5">
+            {/* Top Institutional Header with Vinner Lab Symbol */}
+            <div className="header-bar border-b-2 border-slate-900 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="logo-group flex items-center gap-3">
+                {/* Official Vinner Lab Symbol */}
+                <img 
+                  src="/logo.png" 
+                  alt="Vinner Lab Logo" 
+                  className="logo-img w-11 h-11 rounded-lg object-contain shrink-0 border border-slate-300 shadow-2xs bg-white p-0.5" 
+                />
+                <div>
+                  <h1 className="inst-title text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                    VINNER LABORATORY & INNOVATION CENTER
+                  </h1>
+                  <p className="inst-sub text-[10px] text-slate-600 font-medium">
+                    Central Hardware Inventory, Microelectronics & Embedded Systems Facility
+                  </p>
+                </div>
+              </div>
+
+              {/* Invoice Reference Badge */}
+              <div className="invoice-badge bg-white border-2 border-slate-900 px-3 py-1.5 rounded-lg text-left sm:text-right sm:min-w-44 shrink-0">
+                <span className="invoice-badge-label text-[8px] font-bold text-slate-500 uppercase tracking-wider block">OFFICIAL INVOICE NO.</span>
+                <span className="invoice-badge-num font-mono text-xs sm:text-sm font-black text-slate-900 block mt-0.5">
+                  {request.requestCode}
+                </span>
+                <span className="invoice-badge-date text-[10px] text-slate-600 block">
+                  Issue Date: {formatDate(request.createdAt)}
+                </span>
               </div>
             </div>
 
-            {/* Invoice Reference Badge */}
-            <div className="invoice-badge bg-white border-2 border-slate-900 px-3 py-1.5 rounded-lg text-left sm:text-right sm:min-w-44 shrink-0">
-              <span className="invoice-badge-label text-[8px] font-bold text-slate-500 uppercase tracking-wider block">OFFICIAL INVOICE NO.</span>
-              <span className="invoice-badge-num font-mono text-xs sm:text-sm font-black text-slate-900 block mt-0.5">
-                {request.requestCode}
-              </span>
-              <span className="invoice-badge-date text-[10px] text-slate-600 block">
-                Issue Date: {formatDate(request.createdAt)}
+            {/* Document Subheader */}
+            <div className="sub-bar flex items-center justify-between text-[11px] border-b border-slate-200 pb-1.5">
+              <h2 className="font-bold text-slate-900 uppercase tracking-wider">
+                HARDWARE ISSUE INVOICE & HANDOVER RECEIPT
+              </h2>
+              <span className="text-slate-600 font-medium text-[10px]">
+                {request.status === 'completed'
+                  ? 'Status: Fully Handed Over'
+                  : request.status === 'partially_issued'
+                  ? 'Status: Partially Handed Over'
+                  : 'Status: Approved for Collection'}
               </span>
             </div>
-          </div>
 
-          {/* Document Subheader */}
-          <div className="sub-bar flex items-center justify-between text-[11px] border-b border-slate-200 pb-1.5">
-            <h2 className="font-bold text-slate-900 uppercase tracking-wider">
-              HARDWARE ISSUE INVOICE & HANDOVER RECEIPT
-            </h2>
-            <span className="text-slate-600 font-medium text-[10px]">
-              {request.status === 'completed'
-                ? 'Status: Fully Handed Over'
-                : request.status === 'partially_issued'
-                ? 'Status: Partially Handed Over'
-                : 'Status: Approved for Collection'}
-            </span>
-          </div>
-
-          {/* Student / Faculty Recipient & Project Details */}
-          <div className="creds-grid grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-slate-300 text-[11px]">
-            {/* Column 1: Recipient Details */}
-            <div className="space-y-1">
-              <span className="creds-col-label text-[8px] font-bold text-slate-500 uppercase tracking-wider block">
-                Borrower / Recipient Credentials
-              </span>
-              <p className="text-xs font-bold text-slate-900">
-                {request.recipientName || request.requesterName}
-              </p>
-              <p className="text-slate-700">
-                <strong>Reg / Emp No:</strong> {request.recipientRegNumber || request.requesterRegNumber}
-              </p>
-              <p className="text-slate-700">
-                <strong>Role:</strong> {request.recipientType === 'faculty' ? 'Teacher / Faculty Advisor' : 'Student'}
-              </p>
-              {request.studentCode && request.recipientType !== 'faculty' && (
-                <p className="text-slate-700 font-mono">
-                  <strong>Student Code:</strong> {request.studentCode}
+            {/* Student / Faculty Recipient & Project Details */}
+            <div className="creds-grid grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-slate-300 text-[11px]">
+              {/* Column 1: Recipient Details */}
+              <div className="space-y-1">
+                <span className="creds-col-label text-[8px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Borrower / Recipient Credentials
+                </span>
+                <p className="text-xs font-bold text-slate-900">
+                  {request.recipientName || request.requesterName}
                 </p>
-              )}
-              {request.requesterEmail && (
                 <p className="text-slate-700">
-                  <strong>Email:</strong> {request.requesterEmail}
+                  <strong>Reg / Emp No:</strong> {request.recipientRegNumber || request.requesterRegNumber}
                 </p>
-              )}
-              {request.requesterMobile && (
                 <p className="text-slate-700">
-                  <strong>Phone / Mobile:</strong> {request.requesterMobile}
+                  <strong>Role:</strong> {request.recipientType === 'faculty' ? 'Teacher / Faculty Advisor' : 'Student'}
                 </p>
-              )}
-            </div>
+                {request.studentCode && request.recipientType !== 'faculty' && (
+                  <p className="text-slate-700 font-mono">
+                    <strong>Student Code:</strong> {request.studentCode}
+                  </p>
+                )}
+                {request.requesterEmail && (
+                  <p className="text-slate-700">
+                    <strong>Email:</strong> {request.requesterEmail}
+                  </p>
+                )}
+                {request.requesterMobile && (
+                  <p className="text-slate-700">
+                    <strong>Phone / Mobile:</strong> {request.requesterMobile}
+                  </p>
+                )}
+              </div>
 
-            {/* Column 2: Authorization & Project Details */}
-            <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-slate-300 pt-2 sm:pt-0 sm:pl-3">
-              <span className="creds-col-label text-[8px] font-bold text-slate-500 uppercase tracking-wider block">
-                Authorization & Project Context
-              </span>
-              <p className="text-slate-900 font-bold">
-                {request.projectCode ? `Project Team Code (${request.projectCode})` : 'Personal Account Issue'}
-              </p>
-              <p className="text-slate-700">
-                <strong>Authorized By:</strong> {request.approvedByAdminName || 'Lab Administrator'}
-              </p>
-              <p className="text-slate-700">
-                <strong>Requester:</strong> {request.requesterName} ({request.requesterRegNumber})
-              </p>
-              {request.purposeNotes && (
-                <p className="text-slate-700 italic">
-                  <strong>Purpose:</strong> "{request.purposeNotes}"
+              {/* Column 2: Authorization & Project Details */}
+              <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-slate-300 pt-2 sm:pt-0 sm:pl-3">
+                <span className="creds-col-label text-[8px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Authorization & Project Context
+                </span>
+                <p className="text-slate-900 font-bold">
+                  {request.projectCode ? `Project Team Code (${request.projectCode})` : 'Personal Account Issue'}
                 </p>
-              )}
-            </div>
-          </div>
-
-          {/* Components Specification Table */}
-          <div className="table-sec space-y-1.5">
-            <h4 className="sec-heading text-[10px] font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-              <Package className="w-3.5 h-3.5 text-slate-700" />
-              <span>Issued Hardware Components Specification</span>
-            </h4>
-
-            <div className="overflow-x-auto rounded-lg border border-slate-300 overflow-hidden">
-              <table className="w-full text-left text-[11px]">
-                <thead className="bg-slate-900 text-white font-bold text-[10px]">
-                  <tr>
-                    <th className="py-1.5 px-2.5 w-10 text-center">S.No</th>
-                    <th className="py-1.5 px-2.5 w-24">Code</th>
-                    <th className="py-1.5 px-2.5">Component Description</th>
-                    <th className="py-1.5 px-2.5">Category</th>
-                    <th className="py-1.5 px-2.5 text-right">Qty (Units)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {request.items.map((item, idx) => {
-                    const qty = (item.unitsIssuedSoFar && item.unitsIssuedSoFar > 0)
-                      ? item.unitsIssuedSoFar
-                      : (item.approvedQuantity ?? item.requestedQuantity);
-                    return (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="py-1.5 px-2.5 text-center text-slate-500">{idx + 1}</td>
-                        <td className="py-1.5 px-2.5 font-mono font-bold text-slate-900">
-                          {item.componentCode || `IIC-C${idx + 1}`}
-                        </td>
-                        <td className="py-1.5 px-2.5 font-medium text-slate-900">
-                          {item.componentName}
-                        </td>
-                        <td className="py-1.5 px-2.5 text-slate-600">{item.category || 'Hardware'}</td>
-                        <td className="py-1.5 px-2.5 text-right font-bold text-slate-900">
-                          {qty} unit{qty > 1 ? 's' : ''}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot className="bg-slate-50 font-bold text-[11px] border-t-2 border-slate-900">
-                  <tr>
-                    <td colSpan={4} className="py-1.5 px-2.5 text-slate-900">
-                      TOTAL ALLOCATED: {request.items.length} item type(s)
-                    </td>
-                    <td className="py-1.5 px-2.5 text-right text-slate-900">
-                      {totalIssued > 0 ? `${totalIssued} Units Issued` : `${totalApproved} Units Approved`}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-
-          {/* Official Undertaking / Terms & Conditions */}
-          <div className="terms-box p-3 rounded-lg bg-white border-1.5 border-slate-900 text-[10px] text-slate-900 space-y-1 leading-relaxed">
-            <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[10px] text-slate-900">
-              <ShieldCheck className="w-3.5 h-3.5 text-slate-800 shrink-0" />
-              <span>Terms of Loan & Borrower Declaration</span>
-            </div>
-            <p className="text-[9.5px] text-slate-800">
-              I hereby solemnly declare that I have received the laboratory hardware components listed above in working and undamaged physical condition. 
-              I undertake full custody and responsibility for the safe handling, maintenance, and timely return of these items on or before the designated return date. 
-              In the event of loss, theft, physical damage, component burnout, or failure to return, I hereby agree and undertake to either replace the damaged/lost component with an identical genuine model or return the equivalent financial amount as determined by the laboratory administration.
-            </p>
-            <p className="text-[9px] font-bold text-slate-900 pt-1 border-t border-slate-200">
-              Note: Components must be returned with all original cables, pins, and accessories in intact condition.
-            </p>
-          </div>
-
-          {/* Physical Signatures Section (at bottom right for Faculty/Student) */}
-          <div className="sig-section pt-3 flex flex-col sm:flex-row items-end justify-between gap-6 text-[10px]">
-            {/* Left: Lab Administrator Signature */}
-            <div className="sig-box space-y-1 w-full sm:w-56">
-              <div className="sig-line border-b-2 border-slate-900 pb-0.5 h-8 flex items-end">
-                <span className="text-[9px] text-slate-400 italic">Authorized Signature / Seal</span>
+                <p className="text-slate-700">
+                  <strong>Authorized By:</strong> {request.approvedByAdminName || 'Lab Administrator'}
+                </p>
+                <p className="text-slate-700">
+                  <strong>Requester:</strong> {request.requesterName} ({request.requesterRegNumber})
+                </p>
+                {request.purposeNotes && (
+                  <p className="text-slate-700 italic">
+                    <strong>Purpose:</strong> "{request.purposeNotes}"
+                  </p>
+                )}
               </div>
-              <p className="font-bold text-slate-900">Signature of Lab Admin / In-Charge</p>
-              <p className="text-[10px] text-slate-600">Name: {request.approvedByAdminName || 'Lab Administrator'}</p>
-              <p className="text-[10px] text-slate-600">Date: {formatDate(new Date())}</p>
             </div>
 
-            {/* Right: Signature of Faculty / Student */}
-            <div className="sig-box-right space-y-1 w-full sm:w-60 text-left sm:text-right">
-              <div className="sig-line border-b-2 border-slate-900 pb-0.5 h-8 flex items-end justify-start sm:justify-end">
-                <span className="text-[9px] text-slate-400 italic">Sign above this line on printout</span>
+            {/* Components Specification Table */}
+            <div className="table-sec space-y-1.5">
+              <h4 className="sec-heading text-[10px] font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <Package className="w-3.5 h-3.5 text-slate-700" />
+                <span>Issued Hardware Components Specification</span>
+              </h4>
+
+              <div className="overflow-x-auto rounded-lg border border-slate-300 overflow-hidden">
+                <table className="w-full text-left text-[11px]">
+                  <thead className="bg-slate-900 text-white font-bold text-[10px]">
+                    <tr>
+                      <th className="py-1.5 px-2.5 w-10 text-center">S.No</th>
+                      <th className="py-1.5 px-2.5 w-24">Code</th>
+                      <th className="py-1.5 px-2.5">Component Description</th>
+                      <th className="py-1.5 px-2.5">Category</th>
+                      <th className="py-1.5 px-2.5 text-right">Qty (Units)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {request.items.map((item, idx) => {
+                      const qty = (item.unitsIssuedSoFar && item.unitsIssuedSoFar > 0)
+                        ? item.unitsIssuedSoFar
+                        : (item.approvedQuantity ?? item.requestedQuantity);
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="py-1.5 px-2.5 text-center text-slate-500">{idx + 1}</td>
+                          <td className="py-1.5 px-2.5 font-mono font-bold text-slate-900">
+                            {item.componentCode || `IIC-C${idx + 1}`}
+                          </td>
+                          <td className="py-1.5 px-2.5 font-medium text-slate-900">
+                            {item.componentName}
+                          </td>
+                          <td className="py-1.5 px-2.5 text-slate-600">{item.category || 'Hardware'}</td>
+                          <td className="py-1.5 px-2.5 text-right font-bold text-slate-900">
+                            {qty} unit{qty > 1 ? 's' : ''}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-slate-50 font-bold text-[11px] border-t-2 border-slate-900">
+                    <tr>
+                      <td colSpan={4} className="py-1.5 px-2.5 text-slate-900">
+                        TOTAL ALLOCATED: {request.items.length} item type(s)
+                      </td>
+                      <td className="py-1.5 px-2.5 text-right text-slate-900">
+                        {totalIssued > 0 ? `${totalIssued} Units Issued` : `${totalApproved} Units Approved`}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
-              <p className="font-bold text-slate-900">Signature of Faculty / Student</p>
-              <p className="text-[10px] text-slate-600">Name: {request.recipientName || request.requesterName}</p>
-              <p className="text-[10px] text-slate-600">Reg / Emp ID: {request.recipientRegNumber || request.requesterRegNumber}</p>
+            </div>
+
+            {/* Official Undertaking / Terms & Conditions */}
+            <div className="terms-box p-3 rounded-lg bg-white border-1.5 border-slate-900 text-[10px] text-slate-900 space-y-1 leading-relaxed">
+              <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[10px] text-slate-900">
+                <ShieldCheck className="w-3.5 h-3.5 text-slate-800 shrink-0" />
+                <span>Terms of Loan & Borrower Declaration</span>
+              </div>
+              <p className="text-[9.5px] text-slate-800">
+                I hereby solemnly declare that I have received the laboratory hardware components listed above in working and undamaged physical condition. 
+                I undertake full custody and responsibility for the safe handling, maintenance, and timely return of these items on or before the designated return date. 
+                In the event of loss, theft, physical damage, component burnout, or failure to return, I hereby agree and undertake to either replace the damaged/lost component with an identical genuine model or return the equivalent financial amount as determined by the laboratory administration.
+              </p>
+              <p className="text-[9px] font-bold text-slate-900 pt-1 border-t border-slate-200">
+                Note: Components must be returned with all original cables, pins, and accessories in intact condition.
+              </p>
             </div>
           </div>
 
-          {/* Footer Notice */}
-          <div className="footer-txt pt-2 border-t border-slate-200 text-center text-[9px] text-slate-500">
-            This is an official laboratory handover invoice. Keep a physical signed copy for laboratory audit and return verification.
+          {/* Bottom Block: Physical Signatures & Footer Notice (ALWAYS AT BOTTOM) */}
+          <div className="invoice-bottom-block mt-auto pt-6 space-y-3">
+            {/* Physical Signatures Section (at bottom right for Faculty/Student) */}
+            <div className="sig-section pt-3 flex flex-col sm:flex-row items-end justify-between gap-6 text-[10px]">
+              {/* Left: Lab Administrator Signature */}
+              <div className="sig-box space-y-1 w-full sm:w-56">
+                <div className="sig-line border-b-2 border-slate-900 pb-0.5 h-8 flex items-end">
+                  <span className="text-[9px] text-slate-400 italic">Authorized Signature / Seal</span>
+                </div>
+                <p className="font-bold text-slate-900">Signature of Lab Admin / In-Charge</p>
+                <p className="text-[10px] text-slate-600">Name: {request.approvedByAdminName || 'Lab Administrator'}</p>
+                <p className="text-[10px] text-slate-600">Date: {formatDate(new Date())}</p>
+              </div>
+
+              {/* Right: Signature of Faculty / Student */}
+              <div className="sig-box-right space-y-1 w-full sm:w-60 text-left sm:text-right">
+                <div className="sig-line border-b-2 border-slate-900 pb-0.5 h-8 flex items-end justify-start sm:justify-end">
+                  <span className="text-[9px] text-slate-400 italic">Sign above this line on printout</span>
+                </div>
+                <p className="font-bold text-slate-900">Signature of Faculty / Student</p>
+                <p className="text-[10px] text-slate-600">Name: {request.recipientName || request.requesterName}</p>
+                <p className="text-[10px] text-slate-600">Reg / Emp ID: {request.recipientRegNumber || request.requesterRegNumber}</p>
+              </div>
+            </div>
+
+            {/* Footer Notice */}
+            <div className="footer-txt pt-2 border-t border-slate-200 text-center text-[9px] text-slate-500">
+              This is an official laboratory handover invoice. Keep a physical signed copy for laboratory audit and return verification.
+            </div>
           </div>
 
         </div>
