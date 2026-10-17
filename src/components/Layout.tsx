@@ -95,11 +95,11 @@ export default function Layout() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-dvh min-w-0 max-w-full overflow-x-hidden">
         {/* Top Header */}
-        <header className="flex items-center justify-between px-4 sm:px-6 py-2.5 sm:py-3 bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <div className="md:hidden flex items-center gap-2.5">
-              <img src="/logo.png" alt="Vinner Lab Logo" className="w-7 h-7 rounded-lg shadow-xs border border-slate-200 shrink-0" />
-              <span className="text-base font-extrabold text-slate-900 tracking-tight">Vinner Lab</span>
+        <header className="flex items-center justify-between px-3.5 sm:px-6 py-2.5 sm:py-3 bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="md:hidden flex items-center gap-2 min-w-0">
+              <img src="/logo.png" alt="Vinner Lab Logo" className="w-7 h-7 rounded-lg shadow-xs border border-slate-200 shrink-0 object-cover" />
+              <span className="text-sm font-extrabold text-slate-900 tracking-tight truncate">Vinner Lab</span>
             </div>
             <div className="hidden md:flex items-center gap-2">
               <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
@@ -107,20 +107,11 @@ export default function Layout() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <DeveloperBadge />
-            <button
-              type="button"
-              onClick={() => setIsNotificationsOpen(true)}
-              className="p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl border border-slate-200 transition-all cursor-pointer"
-              aria-label="Notifications"
-              title="Alerts & Notifications"
-            >
-              <Bell className="w-4 h-4" />
-            </button>
             <button 
               type="button"
-              className="md:hidden p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl border border-slate-200 transition-all cursor-pointer"
+              className="md:hidden p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl border border-slate-200 transition-all cursor-pointer shrink-0"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label="Toggle navigation menu"
             >
@@ -190,6 +181,17 @@ export default function Layout() {
                   </Link>
                 </>
               )}
+              <button 
+                type="button" 
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setIsNotificationsOpen(true);
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl font-medium text-sm transition-all text-slate-600 hover:bg-slate-100 text-left"
+              >
+                <Bell className="w-4 h-4" />
+                Alerts & Notifications
+              </button>
             </nav>
             <div className="mt-auto pt-4 border-t border-slate-100">
               <button 
