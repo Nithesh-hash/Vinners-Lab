@@ -19,7 +19,6 @@ import {
   CheckCircle2, 
   AlertCircle, 
   XCircle, 
-  Sparkles, 
   ExternalLink, 
   RotateCcw,
   X,
@@ -136,17 +135,10 @@ export default function ExploreComponents() {
     };
   }, [isCssFullscreen]);
 
-  // Keep isFullscreen synced with isCssFullscreen & handle Escape key
+  // Keep isFullscreen synced with isCssFullscreen
   useEffect(() => {
     if (isCssFullscreen) {
       setIsFullscreen(true);
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          exitAllFullscreen();
-        }
-      };
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
     } else {
       setIsFullscreen(Boolean(getFullscreenElement()));
     }
@@ -160,8 +152,8 @@ export default function ExploreComponents() {
       return;
     }
 
-    // Try native fullscreen first (supports container or documentElement)
-    const targetEl = containerRef.current || document.documentElement;
+    // Try native fullscreen on document.documentElement first (ensures natural window scrolling)
+    const targetEl = document.documentElement;
     const reqFn =
       (targetEl as any).requestFullscreen ||
       (targetEl as any).webkitRequestFullscreen ||
@@ -362,8 +354,7 @@ export default function ExploreComponents() {
                     <h1 className="text-base sm:text-xl font-extrabold text-slate-900 tracking-tight">
                       Vinner Lab
                     </h1>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-brand-50 text-brand-700 border border-brand-200">
-                      <Sparkles className="w-3 h-3 text-brand-600" />
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-brand-50 text-brand-700 border border-brand-200">
                       Hardware Catalog
                     </span>
                   </div>
@@ -398,7 +389,7 @@ export default function ExploreComponents() {
                     ? 'bg-brand-50 border-brand-300 text-brand-700 shadow-xs'
                     : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
                 }`}
-                title={isFullscreen ? 'Exit Fullscreen Mode (Esc)' : 'Enter Fullscreen Mode'}
+                title={isFullscreen ? 'Exit Fullscreen Mode' : 'Enter Fullscreen Mode'}
               >
                 {isFullscreen ? <Minimize2 className="w-4 h-4 text-brand-600" /> : <Maximize2 className="w-4 h-4" />}
                 <span className="hidden lg:inline">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
@@ -976,21 +967,6 @@ export default function ExploreComponents() {
               </Link>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Floating Exit Fullscreen Button when in Fullscreen/Kiosk Mode */}
-      {isFullscreen && (
-        <div className="fixed bottom-5 right-5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <button
-            onClick={exitAllFullscreen}
-            className="px-4 py-2.5 rounded-full bg-slate-900/90 hover:bg-black text-white text-xs font-semibold shadow-xl backdrop-blur-md flex items-center gap-2 border border-white/20 transition-all cursor-pointer group hover:scale-105 active:scale-95"
-            title="Exit Fullscreen Mode (Esc)"
-          >
-            <Minimize2 className="w-3.5 h-3.5 text-brand-400 group-hover:scale-110 transition-transform" />
-            <span>Exit Fullscreen</span>
-            <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono">ESC</span>
-          </button>
         </div>
       )}
 

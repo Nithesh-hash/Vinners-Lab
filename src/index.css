@@ -87,3 +87,14 @@
     background: #ffffff !important;
   }
 }
+
+/* Ensure fullscreen elements always allow vertical scrolling */
+:fullscreen,
+:-webkit-full-screen,
+:-moz-full-screen,
+:-ms-fullscreen {
+  overflow-y: auto !important;
+  height: 100% !important;
+  -webkit-overflow-scrolling: touch;
+}
+
