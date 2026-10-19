@@ -42,9 +42,6 @@ export default function ExploreComponents() {
   const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'available_desc' | 'low_stock'>('available_desc');
 
-  // Fullscreen state
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
   // Selected component modal for high-res preview
   const [previewComponent, setPreviewComponent] = useState<Component | null>(null);
 
@@ -57,7 +54,6 @@ export default function ExploreComponents() {
   const resetIdleTimer = () => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => {
-      // Auto-reset filters for the next visitor
       if (searchQuery || selectedCategory !== 'all' || availabilityFilter !== 'all') {
         setSearchQuery('');
         setSelectedCategory('all');
@@ -81,21 +77,110 @@ export default function ExploreComponents() {
     };
   }, [searchQuery, selectedCategory, availabilityFilter]);
 
-  // Fullscreen change listener
+  // Fullscreen state: supports both native fullscreen and CSS kiosk fallback
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isCssFullscreen, setIsCssFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Helper to detect active fullscreen element across all browser engines
+  const getFullscreenElement = () => {
+    const doc = document as any;
+    return (
+      doc.fullscreenElement ||
+      doc.webkitFullscreenElement ||
+      doc.mozFullScreenElement ||
+      doc.msFullscreenElement ||
+      null
+    );
+  };
+
+  // Exit all fullscreen modes (native + CSS)
+  const exitAllFullscreen = () => {
+    setIsCssFullscreen(false);
+    const doc = document as any;
+    if (getFullscreenElement()) {
+      const exitFn =
+        doc.exitFullscreen ||
+        doc.webkitExitFullscreen ||
+        doc.mozCancelFullScreen ||
+        doc.msExitFullscreen;
+      if (typeof exitFn === 'function') {
+        try {
+          exitFn.call(doc).catch(() => {});
+        } catch {
+          // ignore
+        }
+      }
+    }
+    setIsFullscreen(false);
+  };
+
+  // Listen to native fullscreen changes across all vendor prefixes
   useEffect(() => {
     const handleFsChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      const isNativeFs = Boolean(getFullscreenElement());
+      setIsFullscreen(isNativeFs || isCssFullscreen);
     };
-    document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, []);
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+    const doc = document as any;
+    doc.addEventListener('fullscreenchange', handleFsChange);
+    doc.addEventListener('webkitfullscreenchange', handleFsChange);
+    doc.addEventListener('mozfullscreenchange', handleFsChange);
+    doc.addEventListener('MSFullscreenChange', handleFsChange);
+
+    return () => {
+      doc.removeEventListener('fullscreenchange', handleFsChange);
+      doc.removeEventListener('webkitfullscreenchange', handleFsChange);
+      doc.removeEventListener('mozfullscreenchange', handleFsChange);
+      doc.removeEventListener('MSFullscreenChange', handleFsChange);
+    };
+  }, [isCssFullscreen]);
+
+  // Keep isFullscreen synced with isCssFullscreen & handle Escape key
+  useEffect(() => {
+    if (isCssFullscreen) {
+      setIsFullscreen(true);
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          exitAllFullscreen();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
     } else {
-      document.exitFullscreen().catch(() => {});
+      setIsFullscreen(Boolean(getFullscreenElement()));
     }
+  }, [isCssFullscreen]);
+
+  // Toggle fullscreen with cross-browser prefixes & automatic CSS Kiosk fallback
+  const toggleFullscreen = async () => {
+    // If currently in any fullscreen mode, exit
+    if (isFullscreen || isCssFullscreen || Boolean(getFullscreenElement())) {
+      exitAllFullscreen();
+      return;
+    }
+
+    // Try native fullscreen first (supports container or documentElement)
+    const targetEl = containerRef.current || document.documentElement;
+    const reqFn =
+      (targetEl as any).requestFullscreen ||
+      (targetEl as any).webkitRequestFullscreen ||
+      (targetEl as any).mozRequestFullScreen ||
+      (targetEl as any).msRequestFullscreen;
+
+    if (typeof reqFn === 'function') {
+      try {
+        await reqFn.call(targetEl);
+        setIsFullscreen(true);
+        return;
+      } catch (err) {
+        console.warn('Native fullscreen blocked or restricted by browser; activating CSS Kiosk mode fallback:', err);
+      }
+    }
+
+    // Fallback: Activate CSS Kiosk Fullscreen (guaranteed to work in all browsers/iframes/mobile)
+    setIsCssFullscreen(true);
+    setIsFullscreen(true);
   };
 
   // Real-time Firestore Listener
@@ -245,7 +330,12 @@ export default function ExploreComponents() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col font-sans selection:bg-brand-500 selection:text-white">
+    <div 
+      ref={containerRef}
+      className={`min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col font-sans selection:bg-brand-500 selection:text-white ${
+        isCssFullscreen ? 'fixed inset-0 z-50 overflow-y-auto w-screen h-screen' : ''
+      }`}
+    >
       {/* Top Banner & Header */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4">
@@ -300,13 +390,17 @@ export default function ExploreComponents() {
                 <span>Live Sync</span>
               </div>
 
-              {/* Fullscreen toggle */}
+              {/* Fullscreen toggle button */}
               <button
                 onClick={toggleFullscreen}
-                className="p-2 sm:px-3 sm:py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen Mode'}
+                className={`p-2 sm:px-3 sm:py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer ${
+                  isFullscreen
+                    ? 'bg-brand-50 border-brand-300 text-brand-700 shadow-xs'
+                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
+                }`}
+                title={isFullscreen ? 'Exit Fullscreen Mode (Esc)' : 'Enter Fullscreen Mode'}
               >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                {isFullscreen ? <Minimize2 className="w-4 h-4 text-brand-600" /> : <Maximize2 className="w-4 h-4" />}
                 <span className="hidden lg:inline">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
               </button>
 
@@ -566,7 +660,7 @@ export default function ExploreComponents() {
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5 sm:space-y-6">
               {filteredComponents.map((component) => {
                 const isOutOfStock = component.availableQuantity <= 0;
                 const isLowStock = !isOutOfStock && component.availableQuantity <= component.lowStockThreshold;
@@ -575,149 +669,159 @@ export default function ExploreComponents() {
                 return (
                   <article
                     key={component.id}
-                    className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-slate-300 transition-all p-4 sm:p-5 flex flex-col md:flex-row gap-5 lg:gap-7 items-stretch group"
+                    className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.07)] hover:border-slate-300/90 transition-all duration-300 overflow-hidden flex flex-col md:flex-row items-stretch group"
                   >
-                    {/* LEFT COLUMN: COMPONENT PHOTO (AMAZON STYLE) */}
+                    {/* LEFT COLUMN: COMPONENT HARDWARE PHOTO SHOWCASE (EDITORIAL PEDESTAL) */}
                     <div 
                       onClick={() => setPreviewComponent(component)}
-                      className="w-full md:w-56 lg:w-64 h-52 sm:h-60 md:h-52 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/70 rounded-2xl overflow-hidden shrink-0 relative flex items-center justify-center p-3 cursor-pointer group/img transition-all"
+                      className="w-full md:w-72 lg:w-80 shrink-0 p-3.5 sm:p-5 flex flex-col justify-center bg-[#F9FAFB] md:border-r border-b md:border-b-0 border-slate-200/70 cursor-pointer"
                     >
-                      {component.imageUrl ? (
-                        <img
-                          src={component.imageUrl}
-                          alt={component.name}
-                          className="w-full h-full object-contain group-hover/img:scale-105 transition-transform duration-300"
-                          onError={(e) => {
-                            // Fallback to placeholder if broken link
-                            (e.target as HTMLImageElement).src = '/logo.png';
-                          }}
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-center p-4">
-                          <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200/80 flex items-center justify-center shadow-xs text-slate-600 mb-2 group-hover/img:scale-105 transition-transform">
-                            {getCategoryIcon(component.category)}
+                      <div className="relative w-full h-52 sm:h-60 md:h-56 rounded-2xl bg-white border border-slate-200/90 shadow-[0_4px_18px_rgba(0,0,0,0.05)] overflow-hidden flex items-center justify-center p-4 group/plate transition-all duration-300 group-hover:border-brand-300 group-hover:shadow-[0_8px_26px_rgba(80,117,193,0.15)]">
+                        {component.imageUrl ? (
+                          <img
+                            src={component.imageUrl}
+                            alt={component.name}
+                            className="w-full h-full object-contain group-hover/plate:scale-105 transition-transform duration-500 ease-out"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/logo.png';
+                            }}
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-center p-4 space-y-2">
+                            <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-center shadow-2xs text-slate-700 group-hover/plate:scale-110 transition-transform duration-300">
+                              {getCategoryIcon(component.category)}
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-slate-800 block">{component.category || 'Hardware'}</span>
+                              <span className="text-[10px] text-slate-400 font-medium">Vinner Lab Certified</span>
+                            </div>
                           </div>
-                          <span className="text-xs font-bold text-slate-700">{component.category}</span>
-                          <span className="text-[10px] text-slate-400 mt-0.5">Vinner Lab Component</span>
+                        )}
+
+                        {/* Top-Left Category Badge */}
+                        <div className="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full bg-white/95 backdrop-blur-md text-[10px] sm:text-[11px] font-bold text-slate-700 border border-slate-200/80 shadow-2xs flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-brand-500"></span>
+                          <span>{component.category}</span>
                         </div>
-                      )}
 
-                      {/* Floating Category Pill on Image */}
-                      <span className="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full bg-white/90 backdrop-blur-xs text-[11px] font-bold text-slate-700 border border-slate-200/80 shadow-2xs">
-                        {component.category}
-                      </span>
-
-                      {/* Touch / Click to Zoom badge */}
-                      <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-slate-900/70 text-white text-[10px] font-semibold opacity-0 group-hover/img:opacity-100 transition-opacity">
-                        Tap to enlarge
-                      </span>
+                        {/* Bottom-Right Tap to Enlarge Badge */}
+                        <div className="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-semibold opacity-0 group-hover/plate:opacity-100 transition-opacity duration-200 shadow-sm flex items-center gap-1">
+                          <Maximize2 className="w-3 h-3" />
+                          <span>Inspect</span>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* RIGHT COLUMN: DETAILS & AVAILABILITY (AMAZON STYLE) */}
-                    <div className="flex-1 flex flex-col justify-between min-w-0">
+                    {/* RIGHT COLUMN: EDITORIAL SHOWCASE (EXACT VISUAL HIERARCHY AS REFERENCE IMAGE) */}
+                    <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 lg:p-7 min-w-0">
                       <div>
-                        {/* 1. COMPONENT NAME & CODE */}
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 
-                              onClick={() => setPreviewComponent(component)}
-                              className="text-xl sm:text-2xl font-extrabold text-slate-900 group-hover:text-brand-600 transition-colors cursor-pointer leading-tight"
-                            >
-                              {component.name}
-                            </h3>
-                            {component.code && (
-                              <span className="font-mono text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200/90 shadow-2xs">
-                                {component.code}
-                              </span>
+                        {/* 1. TOP SUBTITLE WITH DOT BULLETS (LIKE • STARTER • VEG IN REFERENCE IMAGE) */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                          <div className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                            <span>•</span>
+                            <span className="text-slate-500">VINNER LAB</span>
+                            <span>•</span>
+                            <span className="text-slate-700">{component.category}</span>
+                            {component.storageLocation && (
+                              <>
+                                <span>•</span>
+                                <span className="text-slate-500">{component.storageLocation}</span>
+                              </>
                             )}
                           </div>
 
-                          {/* Stock status pill header */}
-                          <div className="shrink-0">
+                          {/* Live Availability Tag */}
+                          <div>
                             {isInStock && (
-                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                 In Stock
                               </span>
                             )}
                             {isLowStock && (
-                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                <AlertCircle className="w-3.5 h-3.5" />
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs">
+                                <AlertCircle className="w-3 h-3" />
                                 Low Stock
                               </span>
                             )}
                             {isOutOfStock && (
-                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                <XCircle className="w-3.5 h-3.5" />
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+                                <XCircle className="w-3 h-3" />
                                 Unavailable
                               </span>
                             )}
                           </div>
                         </div>
 
-                        {/* Category & Location info */}
-                        <div className="flex items-center gap-2 mt-1 text-xs text-slate-400 font-medium">
-                          <span>Category: <strong className="text-slate-600 font-semibold">{component.category}</strong></span>
-                          {component.storageLocation && (
-                            <>
-                              <span>•</span>
-                              <span>Location: <strong className="text-slate-700">{component.storageLocation}</strong></span>
-                            </>
-                          )}
+                        {/* 2. THE DISTINCT WARM-TINTED BANNER BAND WITH BOLD SERIF TITLE (LIKE "MUSHROOM SALT & PEPPER") */}
+                        <div className="-mx-4 sm:-mx-6 lg:-mx-7 px-4 sm:px-6 lg:px-7 py-3 sm:py-3.5 my-2.5 bg-[#EDE8DF]/75 border-y border-[#DDD7CD] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <h3 
+                              onClick={() => setPreviewComponent(component)}
+                              className="font-serif text-2xl sm:text-3xl lg:text-[2.15rem] font-bold text-slate-900 group-hover:text-brand-800 transition-colors cursor-pointer tracking-tight leading-tight"
+                            >
+                              {component.name}
+                            </h3>
+                            {component.code && (
+                              <span className="font-mono text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-lg bg-white/90 text-indigo-800 border border-indigo-200/90 shadow-2xs">
+                                {component.code}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        {/* 2. DESCRIPTION OF THE COMPONENT (DOWN TO THE NAME) */}
-                        <div className="mt-3">
-                          <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
+                        {/* 3. COMPONENT DESCRIPTION */}
+                        <div className="mt-2.5 text-slate-600 text-xs sm:text-sm leading-relaxed">
+                          <p>
                             {component.description || 'Standard laboratory hardware module registered in the Vinner Lab inventory management system.'}
                           </p>
                         </div>
                       </div>
 
-                      {/* 3. AVAILABILITY SECTION (BELOW DESCRIPTION) */}
+                      {/* 4. STOCK METRICS & ACTION STRIP */}
                       <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
-                        {/* Amazon Style Stock Declaration */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          {/* Stock Status Details */}
                           <div>
                             {isInStock && (
-                              <div className="space-y-0.5">
-                                <p className="text-base sm:text-lg font-extrabold text-emerald-700 flex items-center gap-2">
-                                  <span>In Stock ({component.availableQuantity} units available)</span>
+                              <div>
+                                <p className="text-sm sm:text-base font-extrabold text-emerald-700 flex items-center gap-1.5">
+                                  <span>In Stock — {component.availableQuantity} units ready for issue</span>
                                 </p>
-                                <p className="text-xs text-slate-500">
-                                  {component.availableQuantity} of {component.totalQuantity} units ready for immediate checkout to authorized student teams.
+                                <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                                  Ready for immediate student checkout and project assignment.
                                 </p>
                               </div>
                             )}
 
                             {isLowStock && (
-                              <div className="space-y-0.5">
-                                <p className="text-base sm:text-lg font-extrabold text-amber-700 flex items-center gap-2">
+                              <div>
+                                <p className="text-sm sm:text-base font-extrabold text-amber-700 flex items-center gap-1.5">
                                   <span>Only {component.availableQuantity} units left in stock!</span>
                                 </p>
-                                <p className="text-xs text-slate-500">
-                                  High demand hardware item. Low threshold set at {component.lowStockThreshold} units.
+                                <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                                  High demand hardware item. Threshold set at {component.lowStockThreshold} units.
                                 </p>
                               </div>
                             )}
 
                             {isOutOfStock && (
-                              <div className="space-y-0.5">
-                                <p className="text-base sm:text-lg font-extrabold text-rose-700 flex items-center gap-2">
-                                  <span>Currently Out of Stock / All {component.totalQuantity} Units Issued</span>
+                              <div>
+                                <p className="text-sm sm:text-base font-extrabold text-rose-700 flex items-center gap-1.5">
+                                  <span>All {component.totalQuantity} units currently issued</span>
                                 </p>
-                                <p className="text-xs text-slate-500">
-                                  All units currently deployed in student projects. Availability updates automatically upon return.
+                                <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                                  Currently on loan to student teams. Auto-updates when returned.
                                 </p>
                               </div>
                             )}
                           </div>
 
-                          {/* Quick Actions */}
-                          <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0">
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-2 shrink-0">
                             <button
                               onClick={() => setPreviewComponent(component)}
-                              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
                             >
                               View Specs
                             </button>
@@ -726,17 +830,17 @@ export default function ExploreComponents() {
                               className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${
                                 isOutOfStock
                                   ? 'bg-slate-200 text-slate-500 pointer-events-none'
-                                  : 'bg-brand-600 hover:bg-brand-700 text-white'
+                                  : 'bg-slate-900 hover:bg-black text-white'
                               }`}
                             >
-                              <span>Checkout via Student Login</span>
+                              <span>Sign in to Borrow</span>
                               <ExternalLink className="w-3.5 h-3.5" />
                             </Link>
                           </div>
                         </div>
 
-                        {/* Availability Details without progress bar */}
-                        <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-500 font-medium pt-1">
+                        {/* Stock Metric Pills */}
+                        <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-500 font-medium pt-1.5 border-t border-slate-50">
                           <span>Available: <strong className="text-slate-900 font-bold">{component.availableQuantity}</strong> units</span>
                           <span>Issued: <strong className="text-slate-700 font-semibold">{component.totalQuantity - component.availableQuantity}</strong></span>
                           <span>Total Lab Stock: <strong className="text-slate-700 font-semibold">{component.totalQuantity}</strong> units</span>
@@ -769,14 +873,14 @@ export default function ExploreComponents() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base sm:text-lg font-extrabold text-slate-900">{previewComponent.name}</h3>
+                    <h3 className="font-serif text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">{previewComponent.name}</h3>
                     {previewComponent.code && (
                       <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
                         {previewComponent.code}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500">Category: {previewComponent.category}</p>
+                  <p className="text-xs text-slate-500 font-medium tracking-wide">Category: {previewComponent.category}</p>
                 </div>
               </div>
               <button
@@ -872,6 +976,21 @@ export default function ExploreComponents() {
               </Link>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Exit Fullscreen Button when in Fullscreen/Kiosk Mode */}
+      {isFullscreen && (
+        <div className="fixed bottom-5 right-5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <button
+            onClick={exitAllFullscreen}
+            className="px-4 py-2.5 rounded-full bg-slate-900/90 hover:bg-black text-white text-xs font-semibold shadow-xl backdrop-blur-md flex items-center gap-2 border border-white/20 transition-all cursor-pointer group hover:scale-105 active:scale-95"
+            title="Exit Fullscreen Mode (Esc)"
+          >
+            <Minimize2 className="w-3.5 h-3.5 text-brand-400 group-hover:scale-110 transition-transform" />
+            <span>Exit Fullscreen</span>
+            <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-mono">ESC</span>
+          </button>
         </div>
       )}
 
