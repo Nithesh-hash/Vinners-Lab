@@ -1495,26 +1495,26 @@ export default function StudentDashboard() {
       {/* BOTTOM PADDING BUFFER FOR FIXED DOCK */}
       <div className="h-28" />
 
-      {/* ZOMATO-STYLE FLOATING BOTTOM DOCK */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 p-3 sm:p-4 bg-gradient-to-t from-slate-950/40 to-transparent pointer-events-none">
+      {/* FLOATING BOTTOM DOCK */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 p-3 sm:p-4 bg-gradient-to-t from-white/90 via-white/50 to-transparent pointer-events-none">
         <div className="max-w-4xl mx-auto pointer-events-auto">
           {batchItemCount > 0 ? (
             /* Selected Batch Ready to Request */
-            <div className="bg-slate-900 text-white rounded-2xl p-3.5 sm:p-4 shadow-2xl border border-slate-800 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-300">
+            <div className="bg-white/95 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 shadow-xl border border-slate-200/90 ring-1 ring-slate-900/5 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-300">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
                   <Package className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-sm text-white">
+                    <span className="font-bold text-sm text-slate-900">
                       {batchItemCount} component{batchItemCount > 1 ? 's' : ''} selected
                     </span>
-                    <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-indigo-300 border border-slate-700">
+                    <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                       {batchTotalUnits} units
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                  <p className="text-xs text-slate-500 truncate mt-0.5">
                     Ready to submit issue request to Lab Administrator
                   </p>
                 </div>
@@ -1524,14 +1524,14 @@ export default function StudentDashboard() {
                 <button
                   type="button"
                   onClick={() => setSelectedBatch({})}
-                  className="px-2.5 py-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                 >
                   Clear
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowBatchReviewModal(true)}
-                  className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+                  className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 transition-all cursor-pointer"
                 >
                   <span>Request Issue</span>
                   <ArrowRight className="w-4 h-4" />
@@ -1539,42 +1539,42 @@ export default function StudentDashboard() {
               </div>
             </div>
           ) : activeRequest ? (
-            /* Zomato Active Request Tracker (Preparing in the bottom) */
-            <div className={`rounded-2xl p-3.5 sm:p-4 shadow-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-300 ${
+            /* Active Request Tracker */
+            <div className={`rounded-2xl p-3.5 sm:p-4 shadow-xl border bg-white/95 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-300 ${
               activeRequest.status === 'approved'
-                ? 'bg-emerald-950/95 border-emerald-500/40 text-white backdrop-blur-md'
+                ? 'border-emerald-200 ring-1 ring-emerald-500/10'
                 : activeRequest.status === 'partially_issued'
-                ? 'bg-blue-950/95 border-blue-500/40 text-white backdrop-blur-md'
-                : 'bg-slate-900/95 border-amber-500/40 text-white backdrop-blur-md'
+                ? 'border-blue-200 ring-1 ring-blue-500/10'
+                : 'border-amber-200 ring-1 ring-amber-500/10'
             }`}>
               <div className="flex items-center gap-3 min-w-0">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
                   activeRequest.status === 'approved'
-                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
                     : activeRequest.status === 'partially_issued'
-                    ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
-                    : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                    ? 'bg-blue-50 border-blue-200 text-blue-600'
+                    : 'bg-amber-50 border-amber-200 text-amber-600'
                 }`}>
                   {activeRequest.status === 'approved' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                   ) : activeRequest.status === 'partially_issued' ? (
-                    <History className="w-5 h-5 text-blue-400" />
+                    <History className="w-5 h-5 text-blue-600" />
                   ) : (
-                    <Clock className="w-5 h-5 text-amber-400 animate-spin" />
+                    <Clock className="w-5 h-5 text-amber-600 animate-spin" />
                   )}
                 </div>
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-xs uppercase tracking-wider text-slate-300 font-mono">
+                    <span className="font-bold text-xs uppercase tracking-wider text-slate-700 font-mono">
                       {activeRequest.requestCode}
                     </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                       activeRequest.status === 'approved'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : activeRequest.status === 'partially_issued'
-                        ? 'bg-blue-500/20 text-blue-300 border border-blue-400/40'
-                        : 'bg-amber-500/20 text-amber-300 border border-amber-400/40'
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
                     }`}>
                       {activeRequest.status === 'approved'
                         ? 'Ready for Pickup'
@@ -1583,7 +1583,7 @@ export default function StudentDashboard() {
                         : 'Preparing Approval (Under Review)'}
                     </span>
                   </div>
-                  <p className="text-xs font-semibold text-white mt-0.5 truncate">
+                  <p className="text-xs font-medium text-slate-700 mt-0.5 truncate">
                     {activeRequest.status === 'approved'
                       ? 'Contact lab admin to get the components. Show your Pickup QR at the counter.'
                       : activeRequest.status === 'partially_issued'
@@ -1597,7 +1597,7 @@ export default function StudentDashboard() {
                 <button
                   type="button"
                   onClick={() => setSelectedReqForDetails(activeRequest)}
-                  className="py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors cursor-pointer"
+                  className="py-2 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200/80 transition-colors cursor-pointer"
                 >
                   Details
                 </button>
@@ -1606,16 +1606,16 @@ export default function StudentDashboard() {
                     <button
                       type="button"
                       onClick={() => setSelectedReqForInvoice(activeRequest)}
-                      className="py-2 px-3 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                      className="py-2 px-3.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
                       title="View / Download Invoice PDF"
                     >
-                      <FileText className="w-3.5 h-3.5 text-indigo-300" />
+                      <FileText className="w-3.5 h-3.5 text-indigo-600" />
                       <span>Invoice</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setSelectedReqForQR(activeRequest)}
-                      className="py-2 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+                      className="py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
                     >
                       <QrCode className="w-4 h-4" />
                       <span>Pickup QR</span>
