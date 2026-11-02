@@ -7,9 +7,17 @@ import { GraduationCap, Briefcase, CheckCircle2, Copy, Check, ArrowRight, Shield
 import { cn } from '@/lib/utils';
 import { getNextStudentCode, getAcademicYear } from '@/lib/projectCodeService';
 import DeveloperBadge from '@/components/DeveloperBadge';
+import { useSEO } from '@/hooks/useSEO';
 
 export default function Register() {
   const [accountType, setAccountType] = useState<'student' | 'faculty'>('student');
+
+  // Dynamic Technical SEO
+  useSEO({
+    title: 'Create Account | Vinner Lab — VIT Innovation & Startup Lab',
+    description: 'Register for student or faculty account at Vinner Lab (VIT Innovation and Startup Lab, IIC VIT). System architected by Nithesh Kumar T.',
+    canonical: 'https://vinner-lab-iic.web.app/register'
+  });
   const [formData, setFormData] = useState({
     name: '',
     regNumber: '',

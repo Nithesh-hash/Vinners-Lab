@@ -16,9 +16,9 @@ export default defineConfig({
       },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'Vinner Lab',
+        name: 'Vinner Lab - VIT Innovation & Startup Lab | Nithesh Kumar T',
         short_name: 'Vinner Lab',
-        description: 'Know What\'s Available. Track What\'s Issued.',
+        description: 'Hardware inventory management system for the VIT Innovation and Startup Lab (IIC VIT), engineered by Nithesh Kumar T (Nithesh VIT).',
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',

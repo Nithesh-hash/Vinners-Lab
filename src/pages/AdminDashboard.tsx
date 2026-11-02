@@ -41,8 +41,14 @@ import ImageUploadField from '@/components/ImageUploadField';
 import { getDueDateStatus, checkAndAutoSendDueDateNotifications, deleteProjectCodeRecord, computeNextComponentCode } from '@/lib/projectCodeService';
 import { getEmailConfig, saveEmailConfig, sendTestEmail, notifyAdminOnIssue, DEFAULT_EMAIL_CONFIG, type EmailConfig } from '@/lib/emailService';
 import { adminProcessIssueRequest, adminRejectIssueRequest } from '@/lib/issueRequestService';
+import { useSEO } from '@/hooks/useSEO';
 
 export default function AdminDashboard() {
+  useSEO({
+    title: 'Admin Console | Vinner Lab — VIT Innovation & Startup Lab',
+    noindex: true
+  });
+
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'inventory';

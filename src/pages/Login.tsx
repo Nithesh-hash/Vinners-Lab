@@ -6,9 +6,17 @@ import { doc, getDoc } from 'firebase/firestore';
 import type { UserProfile } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import DeveloperBadge from '@/components/DeveloperBadge';
+import { useSEO } from '@/hooks/useSEO';
 
 export default function Login() {
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Dynamic Technical SEO
+  useSEO({
+    title: 'Sign In | Vinner Lab — VIT Innovation & Startup Lab',
+    description: 'Student and Administrator portal login for Vinner Lab at the VIT Innovation and Startup Lab (IIC VIT), developed by Nithesh Kumar T.',
+    canonical: 'https://vinner-lab-iic.web.app/login'
+  });
   const initialType = searchParams.get('type') === 'admin' ? 'admin' : 'student';
   const [loginType, setLoginType] = useState<'student' | 'admin'>(initialType);
   const [email, setEmail] = useState('');

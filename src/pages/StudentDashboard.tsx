@@ -35,8 +35,14 @@ import IssueInvoiceModal from '@/components/IssueInvoiceModal';
 import NotificationsModal from '@/components/NotificationsModal';
 import { getDueDateStatus, checkAndAutoSendDueDateNotifications, getNextStudentCode, getAcademicYear } from '@/lib/projectCodeService';
 import { submitIssueRequest } from '@/lib/issueRequestService';
+import { useSEO } from '@/hooks/useSEO';
 
 export default function StudentDashboard() {
+  useSEO({
+    title: 'Student Dashboard | Vinner Lab — VIT Innovation & Startup Lab',
+    noindex: true
+  });
+
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'overview';
   

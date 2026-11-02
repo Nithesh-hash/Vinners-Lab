@@ -28,9 +28,17 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import DeveloperBadge from '@/components/DeveloperBadge';
+import { useSEO } from '@/hooks/useSEO';
 
 export default function ExploreComponents() {
   const { user, profile } = useAuth();
+
+  // Dynamic Technical SEO
+  useSEO({
+    title: 'Explore Hardware Components | Vinner Lab — VIT Innovation & Startup Lab',
+    description: 'Explore real-time hardware component inventory, sensors, microcontrollers, and dev boards at the VIT Innovation and Startup Lab (VinnerLab IIC VIT). System engineered by Nithesh Kumar T.',
+    canonical: 'https://vinner-lab-iic.web.app/explore'
+  });
   const [components, setComponents] = useState<Component[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

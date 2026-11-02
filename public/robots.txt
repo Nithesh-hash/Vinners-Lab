@@ -1,0 +1,22 @@
+# robots.txt for Vinner Lab (VIT Innovation and Startup Lab)
+# Architect & Lead Developer: Nithesh Kumar T (Nithesh VIT)
+# Official Website: https://vinner-lab-iic.web.app
+
+User-agent: *
+Allow: /
+Allow: /explore
+Allow: /login
+Allow: /register
+Allow: /assets/
+Allow: /logo.png
+Allow: /favicon.svg
+
+# Protect private authenticated student and admin portals from search engine indexing
+Disallow: /admin
+Disallow: /admin/
+Disallow: /admin/*
+Disallow: /dashboard
+Disallow: /dashboard/*
+
+# XML Sitemap Location
+Sitemap: https://vinner-lab-iic.web.app/sitemap.xml
