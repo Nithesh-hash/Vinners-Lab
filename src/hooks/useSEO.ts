@@ -60,3 +60,4 @@ export function useSEO({ title, description, canonical, noindex }: SEOProps) {
     }
   }, [title, description, canonical, noindex]);
 }
+

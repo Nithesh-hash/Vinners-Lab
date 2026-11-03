@@ -20,3 +20,4 @@ Disallow: /dashboard/*
 
 # XML Sitemap Location
 Sitemap: https://vinner-lab-iic.web.app/sitemap.xml
+
